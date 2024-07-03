@@ -180,17 +180,15 @@ def run_nerf_job(channel, method, properties, body):
     # TODO: Convert all splats to .splat format, not just 30000th iteration
     if CONVERT_TO_SPLAT:
         # Convert the nerf data to splat format for the frontend
-        logger.info(f"Converting {id} iteration 
-                    {SPLAT_ITERATION}.ply to .splat format")
+        logger.info(f"Converting {id} iteration {SPLAT_ITERATION}.ply to .splat format")
         
-        splat_dir = Path("data/nerf_data/splat") / id /
+        splat_dir = Path("data/nerf_data/splat") / id / "splat"
         os.makedirs(splat_dir, exist_ok=True)
         splat_data = nerf_utils.convert_to_splat(output_dir, splat_dir)
         with open(splat_dir / "{SPLAT_ITERATION}.splat", "rb") as f:
             f.write(splat_data)
              
-        logger.info(f"Finished converting {id} iteration 
-                    {SPLAT_ITERATION}.ply to .splat format")
+        logger.info(f"Finished converting {id} iteration {SPLAT_ITERATION}.ply to .splat format")
 
     nerf_output_object = {
         "id": id,

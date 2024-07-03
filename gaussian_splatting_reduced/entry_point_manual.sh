@@ -39,4 +39,4 @@ fi
 
 # Run the main Python script
 echo "Running main Python script"
-python main.py
+python train.py -s data/sfm_data/TestUUID/ -m data/nerf_data/TestUUID

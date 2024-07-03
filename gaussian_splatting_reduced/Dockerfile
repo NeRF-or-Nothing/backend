@@ -31,9 +31,9 @@ RUN add-apt-repository ppa:deadsnakes/ppa \
 RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.8 1 \
     && update-alternatives --install /usr/bin/pip pip /usr/bin/pip3 1
 
-# Install Python dependencies (including prebuilt wheels)
+# Install Python dependencies
 RUN pip install -r requirements.txt
 
 # Allow entry_point.sh to be executable
 RUN ["chmod", "+x", "./entry_point.sh"]
-RUN ["chmod", "+x", "./entry_point2.sh"]
+# RUN ["chmod", "+x", "./entry_point2.sh"] 
