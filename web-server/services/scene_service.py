@@ -16,7 +16,7 @@ class ClientService:
         self.manager = manager
         self.rmqservice = rmqservice
         
-    def handle_incoming_video(self, video_file):
+    def handle_incoming_video(self, video_file, training_mode, output_types):
         # receive video and check for validity
         file_name = secure_filename(video_file.filename)
         if file_name == '':

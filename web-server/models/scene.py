@@ -45,6 +45,11 @@ def from_union(fs, x):
     assert False
 
 
+def from_dict(x: Any) -> dict[str, Any]:
+    assert isinstance(x, dict)
+    return x
+        
+
 def from_list(f: Callable[[Any], T], x: Any) -> List[T]:
     assert isinstance(x, list)
     return [f(y) for y in x]
@@ -178,12 +183,34 @@ class Video:
 
 
 @dataclass
+class JobConfig:
+    sfm_config: Optional[dict] = None
+    nerf_config: Optional[dict] = None
+
+    @staticmethod
+    def from_dict(obj: Any) -> 'JobConfig':
+        assert isinstance(obj, dict)
+        sfm_config = from_union([from_dict, from_none], obj.get("sfm_config"))
+        nerf_config = from_union([from_dict, from_none], obj.get("nerf_config"))
+        return JobConfig(sfm_config, nerf_config)
+
+    def to_dict(self) -> dict:
+        result: dict = {}
+        if self.sfm_config is not None:
+            result["sfm_config"] = from_union([from_dict, from_none], self.sfm_config)
+        if self.nerf_config is not None:
+            result["nerf_config"] = from_union([from_dict, from_none], self.nerf_config)
+        return result
+
+
+@dataclass
 class Scene:
     id: Optional[str] = None
     status: Optional[int] = None
     video: Optional[Video] = None
     sfm: Optional[Sfm] = None
     nerf: Optional[Nerf] = None
+    job_config: Optional[JobConfig] = None 
 
     @staticmethod
     def from_dict(obj: Any) -> 'Scene':
@@ -415,6 +442,12 @@ class SceneManager:
     
     #TODO: define set update get and delete for each object 
     # adds scene to the collection replacing any existing scene with the same id
+    
+    # TODO: add worker configs per job, so that dynamic training/output modes
+    # can be supports
+    def set_job_config(self, _id: str, config: JobConfig):
+        pass
+    
     def set_scene(self, _id: str, scene: Scene):
         key = {"_id": _id}
         value = {"$set": scene.to_dict()}

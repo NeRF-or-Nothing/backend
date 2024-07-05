@@ -5,7 +5,7 @@ import time
 #import magic
 from uuid import uuid4, UUID
 
-from flask import Flask, request, make_response, send_file, send_from_directory, url_for
+from flask import Flask, request, make_response, send_file, send_from_directory, url_for, jsonify
 
 from models.scene import UserManager, QueueListManager
 from services.scene_service import ClientService
@@ -45,16 +45,55 @@ class WebServer:
         @self.app.route("/video", methods=["POST", "PUT"])
         def recv_video():
             """
-            Must decide if we want to hang here until video is done,
-            or return a 20x received and let the front-end query an endpoint
-            given a cookie to see if the video is done periodically
+            Posts 
+            
+            Handles optional request parameters:
+            Defaults to gaussian training mode and splat file generation.
+            @param training_mode: gaussian, tensorf.
+            @param output_types: splat, ply, video, model.
             """
+            
             video_file = request.files.get("file")
+            
+            # TODO: Add support for user parameters
+            
+            # Handle optional request paramters
+            training_mode = request.form.get("training_mode", "gaussian").lower()
+            output_types_str = request.form.get("output_types", "").lower()
+            output_types = [s.strip() for s in output_types_str.split(",") if s != ""]
+            
+            # Validate optional training mode
+            valid_modes = ["gaussian, tensorf"] 
+            if training_mode not in valid_modes:
+                return make_response(jsonify({
+                    "error" : f"Invalid training mode: {training_mode}",
+                    "valid_modes" : valid_modes
+                }), 400)
+            
+            # Validate optional output type
+            valid_types = {
+                "gaussian" : ["splat", "ply", "video"],
+                "tensorf" : ["model", "video"]
+            }
+            
+            invalid_types = [s for s in output_types if s not in valid_types[training_mode]]
+            if invalid_types:
+                return make_response(jsonify({
+                    "error" : f"Invalid output type(s) for {training_mode} mode : {', '.join(invalid_types)}",
+                    "valid_types" : valid_types[training_mode]
+                }), 400)
+            
+            # Fallthrough to default output types  
+            if not output_types:
+                if training_mode == "gaussian":
+                    output_types = ["splat"]
+                elif training_mode == "tensorf":
+                    output_types = ["video"]
             
             # TODO: UUID4 is cryptographically secure on CPython, but this is not guaranteed in the specifications.
             # Might want to change this.
             # TODO: Don't assume videos are in mp4 format
-            uuid = self.cservice.handle_incoming_video(video_file)
+            uuid, output_paths = self.cservice.handle_incoming_video(video_file, training_mode, output_types)
             if(uuid is None):
                 response = make_response("ERROR")
                 response.headers['Access-Control-Allow-Origin'] = '*'
@@ -63,7 +102,11 @@ class WebServer:
             # TODO: now pass to nerf/tensorf/colmap/sfm, and decide if synchronous or asynchronous
             # will we use a db for cookies/ids?
                 
-            response = make_response(uuid)
+            response = make_response(jsonify({
+                "uuid" : uuid,
+                "training_mode" : training_mode,
+                "output_paths" : output_paths
+            }))
             response.headers['Access-Control-Allow-Origin'] = '*'
 
             return response
@@ -107,8 +150,8 @@ class WebServer:
             elif ospath == None or not os.path.exists(ospath):
                 response = make_response(status_str)
             else:
-                status_str = "Video ready"
-                response = make_response(send_file(ospath, as_attachment=True)))
+                status_str = "Splat file ready"
+                response = make_response(send_file(ospath, as_attachment=True))
             response.headers["Access-Control-Allow-Origin"] = '*'
             return response
                 
