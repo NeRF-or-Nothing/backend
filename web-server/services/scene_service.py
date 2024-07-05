@@ -63,10 +63,17 @@ class ClientService:
             #return ("Video ready", nerf.rendered_video_path)
         return None
     
+    def get_nerf_splat_path(self, uuid):
+        # TODO: Change Nerf object to have separate var for splat files instead of model
+        nerf = self.manager.get_nerf(uuid)
+        if nerf:
+            return nerf.model_file_path
+        return None
+    
     # Returns an integer describing the status of the video in the database.
     # Normal videos will have a value of 0 and this is unncessary, but other values
     # encode information on the COLMAP error that went wrong(e.g. 4 is a blurry video)
-    def     get_nerf_flag(self, uuid):
+    def get_nerf_flag(self, uuid):
         nerf = self.manager.get_nerf(uuid)
         if nerf:
             return nerf.flag

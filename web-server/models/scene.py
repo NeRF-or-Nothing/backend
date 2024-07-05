@@ -72,27 +72,30 @@ def to_class(c: Type[T], x: Any) -> dict:
 @dataclass
 class Nerf:
     model_file_path: Optional[str] = None
+    splat_file_path: Optional[str] = None
     rendered_video_path: Optional[str] = None
-    flag: Optional[int] = 0
     training_mode: Optional[str] = None
+    flag: Optional[int] = 0
 
     @staticmethod
     def from_dict(obj: Any) -> 'Nerf':
         assert isinstance(obj, dict)
         model_file_path = from_union([from_str, from_none], obj.get("model_file_path"))
+        splat_file_path = from_union([from_str, from_none], obj.get("splat_file_path"))
         rendered_video_path = from_union([from_str, from_none], obj.get("rendered_video_path"))
-        flag = from_union([from_int, from_none], obj.get("flag"))
         training_mode = from_union([from_str, from_none], obj.get("training_mode"))
-        return Nerf(model_file_path, rendered_video_path, flag)
+        flag = from_union([from_int, from_none], obj.get("flag"))
+        return Nerf(model_file_path, splat_file_path, rendered_video_path, training_mode, flag)
 
     def to_dict(self) -> dict:
         result: dict = {}
         result["model_file_path"] = from_union([from_str, from_none], self.model_file_path)
+        result["splat_file_path"] = from_union([from_str, from_none], self.splat_file_path)
         result["rendered_video_path"] = from_union([from_str, from_none], self.rendered_video_path)
-        result["flag"] = from_union([from_int, from_none], self.flag)
         result["training_mode"] = from_union([from_str, from_none], self.training_mode)
-        #ingnore null
-        result = {k:v for k,v in result.items() if v !=None }
+        result["flag"] = from_union([from_int, from_none], self.flag)
+        #ignore null
+        result = {k:v for k,v in result.items() if v != None }
         return result
 
 
@@ -169,7 +172,7 @@ class Video:
         result["duration"] = from_union([from_float, from_none], self.duration)
         result["frame_count"] = from_union([from_int, from_none], self.frame_count)
 
-        #ingnore null
+        #ignore null
         result = {k:v for k,v in result.items() if v}
         return result
 
@@ -200,7 +203,7 @@ class Scene:
         result["sfm"] = from_union([lambda x: to_class(Sfm, x), from_none], self.sfm)
         result["nerf"] = from_union([lambda x: to_class(Nerf, x), from_none], self.nerf)
 
-        #ingnore null
+        #ignore null
         result = {k:v for k,v in result.items() if v}
         return result
 

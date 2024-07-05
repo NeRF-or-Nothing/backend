@@ -83,6 +83,36 @@ class WebServer:
            
             return response
             
+        @self.app.route("/data/nerf/splat/<splatid>", methods=["GET"])
+        def send_nerf_splat(splatid: str):
+            logger = logger.getLogger('webs-server')
+            ospath = None
+            flag = 0
+            status_str = "Processing"
+            if is_valid_uuid(splatid):
+                # If the splat file generation had no errors return splat path or else error flag
+                if flag == 0:
+                    ospath = self.cservice.get_nerf_splat_path(splatid)
+                else:
+                    flag = self.cservice.get_nerf_flag(splatid)
+                    
+            if flag != 0:
+                # ERROR CODE BREAKDOWN:
+                # 1 = Unknown
+                # 2 = File already exists
+                # 3 = File not found
+                # 4 = Video too blurry
+                # SEE MORE IN video_to_images.py for error codes
+                response = make_response("Returned with error code {}".format(flag))
+            elif ospath == None or not os.path.exists(ospath):
+                response = make_response(status_str)
+            else:
+                status_str = "Video ready"
+                response = make_response(send_file(ospath, as_attachment=True)))
+            response.headers["Access-Control-Allow-Origin"] = '*'
+            return response
+                
+            
         @self.app.route("/data/nerf/<vidid>", methods=["GET"])
         def send_nerf_video(vidid: str):
             logger = logging.getLogger('web-server')
