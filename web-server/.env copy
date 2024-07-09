@@ -1,0 +1,22 @@
+# Since the ".env" file is gitignored, you can use the ".env.example" file to
+# build a new ".env" file when you clone the repo. Keep this file up-to-date
+# when you add new variables to `.env`.
+
+# This file will be committed to version control, so make sure not to have any
+# secrets in it. If you are cloning this repo, create a copy of this file named
+# ".env" and populate it with your secrets.
+
+# When adding additional environment variables, the docker-compose file
+# should be updated accordingly.
+
+# Mongodb user credentials
+MONGO_INITDB_ROOT_USERNAME="admin"
+MONGO_INITDB_ROOT_PASSWORD="password123"
+MONGO_IP="mongodb"
+
+# RabbitMQ user credentials
+RABBITMQ_DEFAULT_USER="admin"
+RABBITMQ_DEFAULT_PASS="password123"
+RABBITMQ_IP="rabbitmq"
+
+# Any changes to Database or RabbitMQ ip address should be in configs/docker_out.json

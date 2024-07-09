@@ -58,7 +58,7 @@ class RabbitMQService:
     def to_url(self,file_path):
         return self.base_url+"/worker-data/"+file_path
 
-    #
+    
     def publish_sfm_job(self, id: str, vid: Video ):
         """
             publish_sfm_job publishes a new job to the sfm-in que hosted on RabbitMQ
@@ -241,12 +241,12 @@ def digest_finished_sfms(rabbitip, rmqservice: RabbitMQService, scene_manager: S
         # Use those frames to revise list of frames used in sfm generation
         #sfm_data['frames'] = [sfm_data['frames'][i] for i in k_sampled]
 
-            del sfm_data['flag']
-            #call SceneManager to store to database
-            vid = Video.from_dict(sfm_data)
-            sfm = Sfm.from_dict(sfm_data)
-            scene_manager.set_sfm(id,sfm)
-            scene_manager.set_video(id,vid)
+        del sfm_data['flag']
+        #call SceneManager to store to database
+        vid = Video.from_dict(sfm_data)
+        sfm = Sfm.from_dict(sfm_data)
+        scene_manager.set_sfm(id,sfm)
+        scene_manager.set_video(id,vid)
 
         #remove video from sfm_list queue manager
         queue_manager.pop_queue("sfm_list",id)
@@ -359,16 +359,15 @@ def digest_finished_nerfs(rabbitip, rmqservice: RabbitMQService, scene_manager: 
         nerf_data = json.loads(body.decode())
         id = nerf_data["id"]
         
-        if not nerf_data.contains("training_mode"):
-            logger.exception(f"Nerf Job {id} Training mode not specified in nerf_data")
+        config = SceneManager.get_scene(id).config.nerf_config
+        
+        if not config.contains("training_mode"):
+            logger.exception(f"Nerf Job {id} Training mode not specified in config")
             return
         
-        if nerf_data["training_mode"] == "gaussian":
-            process_gaussian_job(ch, method, properties, nerf_data)
-        elif nerf_data["training_mode"] == "tensorf":
-            process_tensorf_job(ch, method, properties, nerf_data)
-        else:
-            logger.exception(f"Nerf Job {id} Training mode not recognized in nerf_data")
+        for type in config["output_types"]:
+            pass
+                        
     
     # create unique connection to rabbitmq since pika is NOT thread safe
     rabbitmq_domain = rabbitip

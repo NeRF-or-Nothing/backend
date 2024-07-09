@@ -1,7 +1,8 @@
 import os
+from typing import Optional
 import requests
 import json
-from models.scene import SceneManager, Video
+from models.scene import SceneManager, Video, Scene, Nerf, Sfm, SceneConfig
 from services.queue_service import RabbitMQService
 from uuid import uuid4, UUID
 from werkzeug.utils import secure_filename
@@ -46,8 +47,22 @@ class ClientService:
         video = Video(video_file_path)
         self.manager.set_video(uuid, video)
 
+        # Create Scene 
+        sfm_config = {}
+        nerf_config = {
+            "training_mode" : training_mode,
+            "output_types" : output_types
+        }
+        scene_config = SceneConfig(sfm_config, nerf_config)
+        scene = Scene.from_dict({
+            "id" : uuid,
+            "status" : 0,
+            "video" : video,
+            "config" : scene_config
+        })
+        self.manager.set_scene(scene)
+
         # create rabbitmq job for sfm
-        #TODO
         self.rmqservice.publish_sfm_job(uuid, video)
 
         return uuid
@@ -63,17 +78,39 @@ class ClientService:
             #return ("Video ready", nerf.rendered_video_path)
         return None
     
-    def get_nerf_splat_path(self, uuid):
-        # TODO: Change Nerf object to have separate var for splat files instead of model
+    def get_nerf_resource_path(self, uuid: str, type: str):
+        """
+        Retrieves the file path on web-server for valid training output
+        type files. Outputs null if nerf object for uuid or requested resource 
+        does not exist
+
+        Args:
+            uuid (str): Job id
+            type (str): 
+        Returns:
+            Optional[str]: local file path
+        """
+        # Todo: Testing
         nerf = self.manager.get_nerf(uuid)
-        if nerf:
+        if not nerf:
+            return None
+        
+        if type == "splat":
+            return nerf.splat_file_path
+        if type == "ply":
+            return nerf.ply_file_path
+        if type == "model":
             return nerf.model_file_path
-        return None
+        if type == "video":
+            return nerf.rendered_video_path
     
-    # Returns an integer describing the status of the video in the database.
-    # Normal videos will have a value of 0 and this is unncessary, but other values
-    # encode information on the COLMAP error that went wrong(e.g. 4 is a blurry video)
+    
     def get_nerf_flag(self, uuid):
+        """
+        Returns an integer describing the status of the video in the database.
+        Normal videos will have a value of 0 and this is unncessary, but other values
+        encode information on the COLMAP error that went wrong(e.g. 4 is a blurry video)
+        """
         nerf = self.manager.get_nerf(uuid)
         if nerf:
             return nerf.flag

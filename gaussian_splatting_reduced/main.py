@@ -52,7 +52,7 @@ def send_point_cloud(path):
     return send_from_directory("data/nerf_data/point_cloud/", path)
 
 
-@app.route("data/nerf_data/splat/<path:path>")
+@app.route("/data/nerf_data/splat/<path:path>")
 def send_splats(path):
     """
     Handles incoming get requests for trained nerf data that
@@ -65,6 +65,21 @@ def send_splats(path):
         _type_: Splat data from the requested URI
     """
     return send_from_directory("data/nerf_data/splat/", path)
+
+
+@app.route("/data/nerf_data/<path:path>")
+def send_output(path):
+    """
+    Handles incoming get requests for trained nerf data
+    in various output forms
+
+    Args:
+        path (_type_): Request URI
+        
+    Returns:
+        _type_: Data for the requested resource
+    """
+    return send_from_directory("data/nerf_data/", path)
 
 
 def start_flask():
@@ -133,7 +148,9 @@ def run_nerf_job(channel, method, properties, body):
     # Read the nerf data from the message and convert it to gaussian format
     job_data = json.loads(body.decode())
     job_data_converted = nerf_utils.convert_transforms_to_gaussian(job_data)
+    
     id = job_data_converted["id"]
+    output_types = job_data_converted["output_types"]
 
     # Create input directory for the nerf data
     input_dir: Path = Path("data/sfm_data") / id
@@ -156,44 +173,44 @@ def run_nerf_job(channel, method, properties, body):
     logger.info(f"Running nerf job for {id}")
     logger.info(f"Input directory: {input_dir}")
 
-    # Run the nerf job
-    # TODO: Allow user defined snapshot save frequency (default 7000, 30000 iters)
+    # TODO: Allow user defined snapshot save frequency (default 30000 iters)
     # TODO: Allow user to request available snapshots mid training for frontend render
-    # TODO: Log training and model saving
+    
+    # Run the nerf job
+    # Arbitrary list of save iterations is possible
+    iterations = 30000
     args = [
         "-s", input_dir,
         "-m", output_dir,
-        "--save_iterations", "10000", "20000", "30000",
-        "--iterations", "30000"
+        "--save_iterations", f"{iterations}" 
+        "--iterations", f"{iterations}"
     ]
+    
 
     # Run gaussian splatting model training
     # TODO: Log training and model saving
-    logger.info(f'Running nerf training with args: {args}')
     train.main(args)
-    logger.info(f"Finished training for {id}")
-    # TODO: Post the nerf data to the web-server
-
-    CONVERT_TO_SPLAT = True
-    SPLAT_ITERATION = 30000
-    # TODO: User defined
-    # TODO: Convert all splats to .splat format, not just 30000th iteration
-    if CONVERT_TO_SPLAT:
-        # Convert the nerf data to splat format for the frontend
-        logger.info(f"Converting {id} iteration {SPLAT_ITERATION}.ply to .splat format")
-        
-        splat_dir = Path("data/nerf_data/splat") / id / "splat"
+    
+    # Handle Outputs
+    ply_dir = output_dir / "point_cloud" / f"iteration_{iterations}/point_cloud.ply"
+    splat_dir = output_dir / "splat" / f"iterations"
+    
+    if "ply" in output_types:
+        nerf_output_object["ply_path"] = Path(base_url) / ply_dir
+    if "splat" in output_types:
+        logger.info(f"Converting {id} iteration {iterations} .ply to .splat format")
         os.makedirs(splat_dir, exist_ok=True)
-        splat_data = nerf_utils.convert_to_splat(output_dir, splat_dir)
-        with open(splat_dir / f"{SPLAT_ITERATION}.splat", "rb") as f:
-            f.write(splat_data)
-             
-        logger.info(f"Finished converting {id} iteration {SPLAT_ITERATION}.ply to .splat format")
+        splat_data = nerf_utils.convert_ply_to_splat(ply_dir)
+        open(splat_dir / f"{iterations}.splat", "wb").write(splat_data)
+        nerf_output_object["splat_path"] = Path(base_url) / splat_dir
+    if "video" in output_types:
+        # TODO: Add video render support
+        pass
 
     nerf_output_object = {
-        "id": id,
-        "training_mode": "gaussian",
-        "splat_path": Path(base_url) / f"{output_dir}/splat/{SPLAT_ITERATION}.splat",
+        "id": id, 
+        "ply_file_path" : ply_dir,
+        "splat_file_path" : splat_dir
     }
 
     callback = functools.partial(
@@ -209,7 +226,8 @@ def init_nerf_worker(i, *args):
     """
     Handles the initialization of the nerf worker gaussian process.
     Creates a connection to the rabbitmq server and listens for incoming messages.
-    Each message will be processed in a separate thread.
+    Each message will be processed in a separate thread. Limited to one message at a time
+    due to single gpu constraints.
 
     Args:
         i (_type_): Torch multiprocessing index

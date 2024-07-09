@@ -5,7 +5,7 @@ import time
 #import magic
 from uuid import uuid4, UUID
 
-from flask import Flask, request, make_response, send_file, send_from_directory, url_for, jsonify
+from flask import Flask, request, make_response, send_file, send_from_directory, url_for, jsonify, Response
 
 from models.scene import UserManager, QueueListManager
 from services.scene_service import ClientService
@@ -125,20 +125,29 @@ class WebServer:
                 response = make_response("Error: does not exist")
            
             return response
-            
-        @self.app.route("/data/nerf/splat/<splatid>", methods=["GET"])
-        def send_nerf_splat(splatid: str):
-            logger = logger.getLogger('webs-server')
+        
+        def send_nerf_resource(id: str, resource_type: str) -> Response:
+            """ Handles incoming requests for a resource associated with
+            finished nerf training
+
+            Args:
+                id (str): Job UUID
+                resource_type (str): Indentifier string for resource type
+
+            Returns:
+                _type_: Response containing error or Workzeug send_file
+            """
+            logger = logging.getLogger('web-server')
             ospath = None
             flag = 0
             status_str = "Processing"
-            if is_valid_uuid(splatid):
-                # If the splat file generation had no errors return splat path or else error flag
+            if is_valid_uuid():
+                # If the training had no errors return the resource path, otherwise return the error flag
                 if flag == 0:
-                    ospath = self.cservice.get_nerf_splat_path(splatid)
+                    ospath = self.cservice.get_nerf_resource_path(id, resource_type)
                 else:
-                    flag = self.cservice.get_nerf_flag(splatid)
-                    
+                    flag = self.cservice.get_nerf_flag(id)
+            
             if flag != 0:
                 # ERROR CODE BREAKDOWN:
                 # 1 = Unknown
@@ -150,11 +159,28 @@ class WebServer:
             elif ospath == None or not os.path.exists(ospath):
                 response = make_response(status_str)
             else:
-                status_str = "Splat file ready"
+                status_str = "Video ready"
                 response = make_response(send_file(ospath, as_attachment=True))
-            response.headers["Access-Control-Allow-Origin"] = '*'
-            return response
                 
+            response.headers['Access-Control-Allow-Origin'] = '*'
+            return response
+            
+        @self.app.route("/data/nerf/splat/<splatid>", methods=["GET"])
+        def send_nerf_splat(splatid: str) -> Response:
+            return send_nerf_resource(splatid, "splat")
+                
+        @self.app.route("/data/nerf/video/<vidid>", methods=["GET"])
+        def send_nerf_video2(vidid: str) -> Response:
+            return send_nerf_resource(vidid, "video")
+        
+        @self.app.route("/data/nerf/ply/<plyid>", methods=["GET"])
+        def send_nerf_ply(plyid: str) -> Response:
+            return send_nerf_resource(plyid, "ply")
+               
+        @self.app.route("/data/nerf/model/<modelid>", methods=["GET"])
+        def send_nerf_model(modelid: str) -> Response:
+            return send_nerf_resource(modelid, "model")
+            
             
         @self.app.route("/data/nerf/<vidid>", methods=["GET"])
         def send_nerf_video(vidid: str):

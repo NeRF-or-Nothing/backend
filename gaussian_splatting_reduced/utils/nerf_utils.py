@@ -61,7 +61,7 @@ def convert_transforms_to_tensorf(transforms):
     pass
 
 
-def convert_ply_to_splat(ply_file_path, num_splats, verbose=False):
+def convert_ply_to_splat(ply_file_path, num_splats=sys.maxsize, verbose=False):
     """
     Convert a .ply file to a "compressed" .splat file for use in the
     frontend renderer. 1M splats is roughly 50MB compressed.

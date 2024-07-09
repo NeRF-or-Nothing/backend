@@ -78,8 +78,8 @@ def to_class(c: Type[T], x: Any) -> dict:
 class Nerf:
     model_file_path: Optional[str] = None
     splat_file_path: Optional[str] = None
+    ply_file_path: Optional[str] = None
     rendered_video_path: Optional[str] = None
-    training_mode: Optional[str] = None
     flag: Optional[int] = 0
 
     @staticmethod
@@ -87,17 +87,17 @@ class Nerf:
         assert isinstance(obj, dict)
         model_file_path = from_union([from_str, from_none], obj.get("model_file_path"))
         splat_file_path = from_union([from_str, from_none], obj.get("splat_file_path"))
+        ply_file_path = from_union([from_str, from_none], obj.get("ply_file_path"))
         rendered_video_path = from_union([from_str, from_none], obj.get("rendered_video_path"))
-        training_mode = from_union([from_str, from_none], obj.get("training_mode"))
         flag = from_union([from_int, from_none], obj.get("flag"))
-        return Nerf(model_file_path, splat_file_path, rendered_video_path, training_mode, flag)
+        return Nerf(model_file_path, splat_file_path, ply_file_path, rendered_video_path, flag)
 
     def to_dict(self) -> dict:
         result: dict = {}
         result["model_file_path"] = from_union([from_str, from_none], self.model_file_path)
         result["splat_file_path"] = from_union([from_str, from_none], self.splat_file_path)
+        result["ply_file_path"] = from_union([from_str, from_none], self.ply_file_path)
         result["rendered_video_path"] = from_union([from_str, from_none], self.rendered_video_path)
-        result["training_mode"] = from_union([from_str, from_none], self.training_mode)
         result["flag"] = from_union([from_int, from_none], self.flag)
         #ignore null
         result = {k:v for k,v in result.items() if v != None }
@@ -183,16 +183,16 @@ class Video:
 
 
 @dataclass
-class JobConfig:
+class SceneConfig:
     sfm_config: Optional[dict] = None
     nerf_config: Optional[dict] = None
 
     @staticmethod
-    def from_dict(obj: Any) -> 'JobConfig':
+    def from_dict(obj: Any) -> 'SceneConfig':
         assert isinstance(obj, dict)
         sfm_config = from_union([from_dict, from_none], obj.get("sfm_config"))
         nerf_config = from_union([from_dict, from_none], obj.get("nerf_config"))
-        return JobConfig(sfm_config, nerf_config)
+        return SceneConfig(sfm_config, nerf_config)
 
     def to_dict(self) -> dict:
         result: dict = {}
@@ -210,7 +210,7 @@ class Scene:
     video: Optional[Video] = None
     sfm: Optional[Sfm] = None
     nerf: Optional[Nerf] = None
-    job_config: Optional[JobConfig] = None 
+    config: Optional[SceneConfig] = None 
 
     @staticmethod
     def from_dict(obj: Any) -> 'Scene':
@@ -220,6 +220,7 @@ class Scene:
         video = from_union([Video.from_dict, from_none], obj.get("video"))
         sfm = from_union([Sfm.from_dict, from_none], obj.get("sfm"))
         nerf = from_union([Nerf.from_dict, from_none], obj.get("nerf"))
+        config = from_union([SceneConfig.from_dict, from_none], obj.get("config"))
         return Scene(id, status, video, sfm, nerf)
 
     def to_dict(self) -> dict:
@@ -229,6 +230,7 @@ class Scene:
         result["video"] = from_union([lambda x: to_class(Video, x), from_none], self.video)
         result["sfm"] = from_union([lambda x: to_class(Sfm, x), from_none], self.sfm)
         result["nerf"] = from_union([lambda x: to_class(Nerf, x), from_none], self.nerf)
+        result["config"] = from_union([lambda x: to_class(SceneConfig, x), from_none], self.config)
 
         #ignore null
         result = {k:v for k,v in result.items() if v}
@@ -442,10 +444,10 @@ class SceneManager:
     
     #TODO: define set update get and delete for each object 
     # adds scene to the collection replacing any existing scene with the same id
-    
+    # TODO: 
     # TODO: add worker configs per job, so that dynamic training/output modes
     # can be supports
-    def set_job_config(self, _id: str, config: JobConfig):
+    def set_job_config(self, _id: str, config: SceneConfig):
         pass
     
     def set_scene(self, _id: str, scene: Scene):
