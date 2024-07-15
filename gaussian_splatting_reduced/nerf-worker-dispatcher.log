@@ -1,0 +1,54 @@
+2024-07-14 21:29:59,549 - INFO - dispatch_service - GaussianJobDispatcher Initialized
+2024-07-14 21:29:59,549 - INFO - dispatch_service - base_url: http://nerf-worker-gaussian:5200/
+2024-07-14 21:29:59,549 - INFO - dispatch_service - Number of available GPUs: 1
+2024-07-14 21:29:59,555 - INFO - dispatch_service - Received message, delivery tag 1
+2024-07-14 21:29:59,555 - INFO - dispatch_service - Threads: []
+2024-07-14 21:29:59,691 - INFO - dispatch_service - Running nerf job for 6aecb83c-0dcf-4b26-8096-a629ecf0a0fc, delivery tag 1
+2024-07-14 21:29:59,691 - INFO - dispatch_service - Input directory: data/sfm/6aecb83c-0dcf-4b26-8096-a629ecf0a0fc
+2024-07-14 21:29:59,691 - INFO - dispatch_service - Train_args ['--source_path', 'data/sfm/6aecb83c-0dcf-4b26-8096-a629ecf0a0fc', '--model_path', 'data/nerf/6aecb83c-0dcf-4b26-8096-a629ecf0a0fc', '--save_iterations', '1', '10', '--iterations', '10', '--job_id', '6aecb83c-0dcf-4b26-8096-a629ecf0a0fc']
+2024-07-14 21:29:59,822 - INFO - __init__ - Found transforms_train.json file, assuming Blender data set!
+2024-07-14 21:29:59,900 - INFO - dataset_readers - Reading Test Transforms
+2024-07-14 21:29:59,984 - INFO - __init__ - Loading cameras for resolution scale 1.0
+2024-07-14 21:30:01,014 - INFO - __init__ - Scene: Saving point cloud at data/nerf/6aecb83c-0dcf-4b26-8096-a629ecf0a0fc/point_cloud/iteration_1/6aecb83c-0dcf-4b26-8096-a629ecf0a0fc.ply
+2024-07-14 21:30:01,537 - INFO - __init__ - Scene: Saving point cloud at data/nerf/6aecb83c-0dcf-4b26-8096-a629ecf0a0fc/point_cloud/iteration_10/6aecb83c-0dcf-4b26-8096-a629ecf0a0fc.ply
+2024-07-14 21:30:07,062 - INFO - dispatch_service - Publishing message {"id": "6aecb83c-0dcf-4b26-8096-a629ecf0a0fc", "output_endpoints": {"splat_cloud": {"endpoint": "http://nerf-worker-gaussian:5200/data/nerf/splat_cloud/6aecb83c-0dcf-4b26-8096-a629ecf0a0fc", "save_iterations": [1, 10]}, "point_cloud": {"endpoint": "http://nerf-worker-gaussian:5200/data/nerf/point_cloud/6aecb83c-0dcf-4b26-8096-a629ecf0a0fc", "save_iterations": [1, 10]}}}, delivery tag 1
+2024-07-14 21:30:07,062 - INFO - dispatch_service - Trying to ack pub body {"id": "6aecb83c-0dcf-4b26-8096-a629ecf0a0fc", "output_endpoints": {"splat_cloud": {"endpoint": "http://nerf-worker-gaussian:5200/data/nerf/splat_cloud/6aecb83c-0dcf-4b26-8096-a629ecf0a0fc", "save_iterations": [1, 10]}, "point_cloud": {"endpoint": "http://nerf-worker-gaussian:5200/data/nerf/point_cloud/6aecb83c-0dcf-4b26-8096-a629ecf0a0fc", "save_iterations": [1, 10]}}}
+2024-07-14 21:30:07,063 - INFO - dispatch_service - Received message, delivery tag 2
+2024-07-14 21:30:07,063 - INFO - dispatch_service - Threads: [<Thread(Thread-2, stopped 140564063794944)>]
+2024-07-14 21:30:07,248 - INFO - dispatch_service - Running nerf job for 358d6f4d-9bc0-40d8-9f93-bce409a80ce0, delivery tag 2
+2024-07-14 21:30:07,248 - INFO - dispatch_service - Input directory: data/sfm/358d6f4d-9bc0-40d8-9f93-bce409a80ce0
+2024-07-14 21:30:07,248 - INFO - dispatch_service - Train_args ['--source_path', 'data/sfm/358d6f4d-9bc0-40d8-9f93-bce409a80ce0', '--model_path', 'data/nerf/358d6f4d-9bc0-40d8-9f93-bce409a80ce0', '--save_iterations', '1', '10', '--iterations', '10', '--job_id', '358d6f4d-9bc0-40d8-9f93-bce409a80ce0']
+2024-07-14 21:30:07,249 - INFO - __init__ - Found transforms_train.json file, assuming Blender data set!
+2024-07-14 21:30:07,345 - INFO - dataset_readers - Reading Test Transforms
+2024-07-14 21:30:07,442 - INFO - dataset_readers - Generating random point cloud (100000)...
+2024-07-14 21:30:07,560 - INFO - __init__ - Loading cameras for resolution scale 1.0
+2024-07-14 21:30:07,751 - INFO - __init__ - Scene: Saving point cloud at data/nerf/358d6f4d-9bc0-40d8-9f93-bce409a80ce0/point_cloud/iteration_1/358d6f4d-9bc0-40d8-9f93-bce409a80ce0.ply
+2024-07-14 21:30:08,507 - INFO - __init__ - Scene: Saving point cloud at data/nerf/358d6f4d-9bc0-40d8-9f93-bce409a80ce0/point_cloud/iteration_10/358d6f4d-9bc0-40d8-9f93-bce409a80ce0.ply
+2024-07-14 21:30:14,064 - INFO - dispatch_service - Publishing message {"id": "358d6f4d-9bc0-40d8-9f93-bce409a80ce0", "output_endpoints": {"splat_cloud": {"endpoint": "http://nerf-worker-gaussian:5200/data/nerf/splat_cloud/358d6f4d-9bc0-40d8-9f93-bce409a80ce0", "save_iterations": [1, 10]}, "point_cloud": {"endpoint": "http://nerf-worker-gaussian:5200/data/nerf/point_cloud/358d6f4d-9bc0-40d8-9f93-bce409a80ce0", "save_iterations": [1, 10]}}}, delivery tag 2
+2024-07-14 21:30:14,065 - INFO - dispatch_service - Trying to ack pub body {"id": "358d6f4d-9bc0-40d8-9f93-bce409a80ce0", "output_endpoints": {"splat_cloud": {"endpoint": "http://nerf-worker-gaussian:5200/data/nerf/splat_cloud/358d6f4d-9bc0-40d8-9f93-bce409a80ce0", "save_iterations": [1, 10]}, "point_cloud": {"endpoint": "http://nerf-worker-gaussian:5200/data/nerf/point_cloud/358d6f4d-9bc0-40d8-9f93-bce409a80ce0", "save_iterations": [1, 10]}}}
+2024-07-14 21:30:14,065 - INFO - dispatch_service - Received message, delivery tag 3
+2024-07-14 21:30:14,065 - INFO - dispatch_service - Threads: [<Thread(Thread-2, stopped 140564063794944)>, <Thread(Thread-4, stopped 140563709949696)>]
+2024-07-14 21:30:14,256 - INFO - dispatch_service - Running nerf job for 4aafadd8-d6fd-4f26-8622-4fd2f9b7eec9, delivery tag 3
+2024-07-14 21:30:14,256 - INFO - dispatch_service - Input directory: data/sfm/4aafadd8-d6fd-4f26-8622-4fd2f9b7eec9
+2024-07-14 21:30:14,256 - INFO - dispatch_service - Train_args ['--source_path', 'data/sfm/4aafadd8-d6fd-4f26-8622-4fd2f9b7eec9', '--model_path', 'data/nerf/4aafadd8-d6fd-4f26-8622-4fd2f9b7eec9', '--save_iterations', '1', '10', '--iterations', '10', '--job_id', '4aafadd8-d6fd-4f26-8622-4fd2f9b7eec9']
+2024-07-14 21:30:14,257 - INFO - __init__ - Found transforms_train.json file, assuming Blender data set!
+2024-07-14 21:30:14,356 - INFO - dataset_readers - Reading Test Transforms
+2024-07-14 21:30:14,451 - INFO - dataset_readers - Generating random point cloud (100000)...
+2024-07-14 21:30:14,565 - INFO - __init__ - Loading cameras for resolution scale 1.0
+2024-07-14 21:30:14,824 - INFO - __init__ - Scene: Saving point cloud at data/nerf/4aafadd8-d6fd-4f26-8622-4fd2f9b7eec9/point_cloud/iteration_1/4aafadd8-d6fd-4f26-8622-4fd2f9b7eec9.ply
+2024-07-14 21:30:17,553 - INFO - __init__ - Scene: Saving point cloud at data/nerf/4aafadd8-d6fd-4f26-8622-4fd2f9b7eec9/point_cloud/iteration_10/4aafadd8-d6fd-4f26-8622-4fd2f9b7eec9.ply
+2024-07-14 21:30:23,288 - INFO - dispatch_service - Publishing message {"id": "4aafadd8-d6fd-4f26-8622-4fd2f9b7eec9", "output_endpoints": {"splat_cloud": {"endpoint": "http://nerf-worker-gaussian:5200/data/nerf/splat_cloud/4aafadd8-d6fd-4f26-8622-4fd2f9b7eec9", "save_iterations": [1, 10]}, "point_cloud": {"endpoint": "http://nerf-worker-gaussian:5200/data/nerf/point_cloud/4aafadd8-d6fd-4f26-8622-4fd2f9b7eec9", "save_iterations": [1, 10]}}}, delivery tag 3
+2024-07-14 21:30:23,288 - INFO - dispatch_service - Trying to ack pub body {"id": "4aafadd8-d6fd-4f26-8622-4fd2f9b7eec9", "output_endpoints": {"splat_cloud": {"endpoint": "http://nerf-worker-gaussian:5200/data/nerf/splat_cloud/4aafadd8-d6fd-4f26-8622-4fd2f9b7eec9", "save_iterations": [1, 10]}, "point_cloud": {"endpoint": "http://nerf-worker-gaussian:5200/data/nerf/point_cloud/4aafadd8-d6fd-4f26-8622-4fd2f9b7eec9", "save_iterations": [1, 10]}}}
+2024-07-14 21:30:23,289 - INFO - dispatch_service - Received message, delivery tag 4
+2024-07-14 21:30:23,289 - INFO - dispatch_service - Threads: [<Thread(Thread-2, stopped 140564063794944)>, <Thread(Thread-4, stopped 140563709949696)>, <Thread(Thread-5, stopped 140563709949696)>]
+2024-07-14 21:30:23,474 - INFO - dispatch_service - Running nerf job for 96ae3ad0-1ec2-492a-a391-4da1ffaffef6, delivery tag 4
+2024-07-14 21:30:23,474 - INFO - dispatch_service - Input directory: data/sfm/96ae3ad0-1ec2-492a-a391-4da1ffaffef6
+2024-07-14 21:30:23,474 - INFO - dispatch_service - Train_args ['--source_path', 'data/sfm/96ae3ad0-1ec2-492a-a391-4da1ffaffef6', '--model_path', 'data/nerf/96ae3ad0-1ec2-492a-a391-4da1ffaffef6', '--save_iterations', '1', '10', '--iterations', '10', '--job_id', '96ae3ad0-1ec2-492a-a391-4da1ffaffef6']
+2024-07-14 21:30:23,475 - INFO - __init__ - Found transforms_train.json file, assuming Blender data set!
+2024-07-14 21:30:23,572 - INFO - dataset_readers - Reading Test Transforms
+2024-07-14 21:30:23,671 - INFO - dataset_readers - Generating random point cloud (100000)...
+2024-07-14 21:30:23,787 - INFO - __init__ - Loading cameras for resolution scale 1.0
+2024-07-14 21:30:24,000 - INFO - __init__ - Scene: Saving point cloud at data/nerf/96ae3ad0-1ec2-492a-a391-4da1ffaffef6/point_cloud/iteration_1/96ae3ad0-1ec2-492a-a391-4da1ffaffef6.ply
+2024-07-14 21:30:24,682 - INFO - __init__ - Scene: Saving point cloud at data/nerf/96ae3ad0-1ec2-492a-a391-4da1ffaffef6/point_cloud/iteration_10/96ae3ad0-1ec2-492a-a391-4da1ffaffef6.ply
+2024-07-14 21:30:30,260 - INFO - dispatch_service - Publishing message {"id": "96ae3ad0-1ec2-492a-a391-4da1ffaffef6", "output_endpoints": {"splat_cloud": {"endpoint": "http://nerf-worker-gaussian:5200/data/nerf/splat_cloud/96ae3ad0-1ec2-492a-a391-4da1ffaffef6", "save_iterations": [1, 10]}, "point_cloud": {"endpoint": "http://nerf-worker-gaussian:5200/data/nerf/point_cloud/96ae3ad0-1ec2-492a-a391-4da1ffaffef6", "save_iterations": [1, 10]}}}, delivery tag 4
+2024-07-14 21:30:30,260 - INFO - dispatch_service - Trying to ack pub body {"id": "96ae3ad0-1ec2-492a-a391-4da1ffaffef6", "output_endpoints": {"splat_cloud": {"endpoint": "http://nerf-worker-gaussian:5200/data/nerf/splat_cloud/96ae3ad0-1ec2-492a-a391-4da1ffaffef6", "save_iterations": [1, 10]}, "point_cloud": {"endpoint": "http://nerf-worker-gaussian:5200/data/nerf/point_cloud/96ae3ad0-1ec2-492a-a391-4da1ffaffef6", "save_iterations": [1, 10]}}}

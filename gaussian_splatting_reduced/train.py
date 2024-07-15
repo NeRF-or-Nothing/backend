@@ -9,6 +9,7 @@
 # For inquiries contact  george.drettakis@inria.fr
 #
 
+import logging
 import os
 import torch
 from random import randint
@@ -28,11 +29,15 @@ try:
 except ImportError:
     TENSORBOARD_FOUND = False
 
-def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from):
+def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from, job_id):
+    logger = logging.getLogger("nerf-worker-gaussian")
+    logger.info("Traing with dataset uuid: %s", job_id)
     first_iter = 0
     tb_writer = prepare_output_and_logger(dataset)
     gaussians = GaussianModel(dataset.sh_degree)
     scene = Scene(dataset, gaussians)
+    scene.uuid = job_id
+    logger.info("Created Scene, scene.uuid: %s", scene.uuid)
     gaussians.training_setup(opt)
     if checkpoint:
         (model_params, first_iter) = torch.load(checkpoint)
@@ -48,6 +53,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     ema_loss_for_log = 0.0
     progress_bar = tqdm(range(first_iter, opt.iterations), desc="Training progress")
     first_iter += 1
+    logger.info("Starting training loop", flush=True)
+    
     for iteration in range(first_iter, opt.iterations + 1):        
         # if network_gui.conn == None:
         #     network_gui.try_connect()
@@ -106,7 +113,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             # Log and save
             training_report(tb_writer, iteration, Ll1, loss, l1_loss, iter_start.elapsed_time(iter_end), testing_iterations, scene, render, (pipe, background))
             if (iteration in saving_iterations):
-                print("\n[ITER {}] Saving Gaussians".format(iteration))
+                logger.info("Saving Gaussians at iteration: %s, Job %s", iteration, scene.uuid)
                 scene.save(iteration)
 
             # Densification
@@ -128,8 +135,13 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 gaussians.optimizer.zero_grad(set_to_none = True)
 
             if (iteration in checkpoint_iterations):
-                print("\n[ITER {}] Saving Checkpoint".format(iteration))
+                logger.info("Saving Checkpoint at iteration: %s, Job %s", iteration, scene.uuid)
                 torch.save((gaussians.capture(), iteration), scene.model_path + "/chkpnt" + str(iteration) + ".pth")
+    
+    # Clean up
+    del gaussians
+    del scene
+    torch.cuda.empty_cache()
 
 def prepare_output_and_logger(args):    
     if not args.model_path:
@@ -154,6 +166,8 @@ def prepare_output_and_logger(args):
     return tb_writer
 
 def training_report(tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_iterations, scene : Scene, renderFunc, renderArgs):
+    logger = logging.getLogger("nerf-worker-gaussian")
+    
     if tb_writer:
         tb_writer.add_scalar('train_loss_patches/l1_loss', Ll1.item(), iteration)
         tb_writer.add_scalar('train_loss_patches/total_loss', loss.item(), iteration)
@@ -179,8 +193,8 @@ def training_report(tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_i
                     l1_test += l1_loss(image, gt_image).mean().double()
                     psnr_test += psnr(image, gt_image).mean().double()
                 psnr_test /= len(config['cameras'])
-                l1_test /= len(config['cameras'])          
-                print("\n[ITER {}] Evaluating {}: L1 {} PSNR {}".format(iteration, config['name'], l1_test, psnr_test))
+                l1_test /= len(config['cameras'])
+                logger.info("[ITER {}] Evaluating {}: L1 {} PSNR {}".format(iteration, config['name'], l1_test, psnr_test))          
                 if tb_writer:
                     tb_writer.add_scalar(config['name'] + '/loss_viewpoint - l1_loss', l1_test, iteration)
                     tb_writer.add_scalar(config['name'] + '/loss_viewpoint - psnr', psnr_test, iteration)
@@ -189,8 +203,13 @@ def training_report(tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_i
             tb_writer.add_histogram("scene/opacity_histogram", scene.gaussians.get_opacity, iteration)
             tb_writer.add_scalar('total_points', scene.gaussians.get_xyz.shape[0], iteration)
         torch.cuda.empty_cache()
+        
+    # Clean up
+    torch.cuda.empty_cache()
 
 def main(args):
+    logger = logging.getLogger("nerf-worker-gaussian")
+    
     # Set up command line argument parser
     parser = ArgumentParser(description="Training script parameters")
     lp = ModelParams(parser)
@@ -208,6 +227,7 @@ def main(args):
     parser.add_argument("--checkpoint_iterations",
                         nargs="+", type=int, default=[])
     parser.add_argument("--start_checkpoint", type=str, default=None)
+    parser.add_argument("--job_id", type=str, default="1")
     
     
     if not args:
@@ -216,8 +236,6 @@ def main(args):
         args = parser.parse_args(args)
     args.save_iterations.append(args.iterations)
 
-    print("Optimizing " + args.model_path)
-
     # Initialize system state (RNG)
     safe_state(args.quiet)
 
@@ -225,11 +243,10 @@ def main(args):
     # network_gui.init(args.ip, args.port)
     torch.autograd.set_detect_anomaly(args.detect_anomaly)
     training(lp.extract(args), op.extract(args), pp.extract(args), args.test_iterations,
-             args.save_iterations, args.checkpoint_iterations, args.start_checkpoint, args.debug_from)
-
-    # All done
-    print("\nTraining complete.")
-
+             args.save_iterations, args.checkpoint_iterations, args.start_checkpoint, args.debug_from, args.job_id)
+    # Clean up
+    torch.cuda.empty_cache()
+    logger.info("Training completed")
 
 if __name__ == "__main__":
     main(sys.argv[1:])

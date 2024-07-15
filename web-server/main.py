@@ -6,8 +6,8 @@ Afterwards, the Web Server is started.
 from argparser import create_arguments
 from controller import WebServer
 import threading
-from models.scene import SceneManager, QueueListManager
-from services.queue_service import RabbitMQService, digest_finished_sfms, digest_finished_nerfs
+from models.managers import SceneManager, QueueListManager
+from services.queue_service import RabbitMQService, digest_finished_sfms, digest_finished_nerfs, RabbitMQServiceV2
 from services.scene_service import ClientService
 from services.clean_service import cleanup
 from pymongo import MongoClient
@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 import logging
 from log import web_server_logger
 
-
+# TODO: Add sphinx documentation generation. Probably use git actions to auto generate docs on push to master
 def main():
     """
      STARTING LOGGER
@@ -49,15 +49,8 @@ def main():
     # QueueListManager to manage list positions,shared
     queue_man = QueueListManager()
     
-    # Rabbitmq service to post new jobs to the workers <from services>
-    rmq_service = RabbitMQService(rabbitip, queue_man)
-
-    # Starting async operations to pull finished jobs from rabbitmq <from services>
-    # Pass rmq service to the threads to allow them to publish new jobs (thread safe)
-    sfm_output_thread = threading.Thread(target=digest_finished_sfms, args=(rabbitip, rmq_service, scene_man, queue_man))
-    nerf_output_thread = threading.Thread(target=digest_finished_nerfs, args=(rabbitip, rmq_service, scene_man,queue_man))
-    sfm_output_thread.start()
-    nerf_output_thread.start()
+    # Rabbitmq service to post/consume jobs to/from the workers <from services>
+    rmq_service = RabbitMQServiceV2(rabbitip, queue_man, scene_man)
 
     # TODO: async worker to clean up old data
     

@@ -7,3 +7,4 @@ pika==1.3.0
 python-dotenv
 scikit-learn==1.2.2
 kneed
+typing_extensions

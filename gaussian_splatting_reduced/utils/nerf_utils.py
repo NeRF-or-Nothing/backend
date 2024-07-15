@@ -1,11 +1,19 @@
-from plyfile import PlyData
-from io import BytesIO
-from sys import maxsize
+"""
+This file contains utility functions for converting between the different formats used by the gaussian splatting code and the TensoRF code.
+Additioanlly, it contains a function to convert a .ply file to a .splat file for use in the frontend renderer.
+"""
+
+
+import logging
+import json
+import sys
 
 import numpy as np
 
-import json
-import sys
+from plyfile import PlyData
+from io import BytesIO
+from sys import maxsize
+from pathlib import Path
 
 
 def convert_transforms_to_gaussian(transforms):
@@ -40,6 +48,9 @@ def convert_transforms_to_gaussian(transforms):
         ]
     }
     '''
+    logger = logging.getLogger("nerf-worker-gaussian")
+    logger.info("Converting transforms format for {transforms[\"%s\"]}", id)
+
     intrinsic = np.array(transforms["intrinsic_matrix"])
     width = transforms["vid_width"]
     height = transforms["vid_height"]
@@ -51,6 +62,7 @@ def convert_transforms_to_gaussian(transforms):
     for i, fr in enumerate(transforms["frames"]):
         fr["transform_matrix"] = fr.pop("extrinsic_matrix")
 
+    logger.info("Finished converting transforms format for {transforms[\"%s\"]}", id)
     return transforms
 
 
@@ -61,7 +73,7 @@ def convert_transforms_to_tensorf(transforms):
     pass
 
 
-def convert_ply_to_splat(ply_file_path, num_splats=sys.maxsize, verbose=False):
+def convert_ply_to_splat(ply_file_path: Path, num_splats: int = sys.maxsize, verbose=False):
     """
     Convert a .ply file to a "compressed" .splat file for use in the
     frontend renderer. 1M splats is roughly 50MB compressed.
@@ -71,6 +83,8 @@ def convert_ply_to_splat(ply_file_path, num_splats=sys.maxsize, verbose=False):
         num_splats (_type_): Number of splats to convert. Defaults to maxsize.
         verbose (bool, optional): Defaults to False.
     """
+    logger = logging.getLogger("nerf-worker-gaussian")
+
     plydata = PlyData.read(ply_file_path)
     vert = plydata["vertex"]
     sorted_indices = np.argsort(
@@ -111,14 +125,14 @@ def convert_ply_to_splat(ply_file_path, num_splats=sys.maxsize, verbose=False):
             .tobytes()
         )
 
-        if verbose and num_converted % int(num_splats / 100) == 0:
-            print(f"Converted {num_converted} splats", end="\r")
+        if verbose and num_converted % int(num_splats / 1000) == 0:
+            logger.info("Converted %d splats", num_converted)
 
         num_converted += 1
         if num_splats != 0 and num_converted == num_splats:
             break
 
-    print(f"Converted {num_converted} splats", end="\r")
+    logger.info("Converted %d splats", num_converted)
     return buffer.getvalue()
 
 

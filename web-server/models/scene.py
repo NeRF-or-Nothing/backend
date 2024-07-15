@@ -1,30 +1,26 @@
+"""
+This file contains the dataclasses for the Scene, Sfm, Nerf, Video, 
+TrainingConfig, Worker, User, and QueueList representations. These dataclasses
+are used to represent the data in the database and are used to serialize and
+deserialize the data to and from JSON. QueueList is used to manage the list of
+job ids for a certain queue.
+"""
+
+import copy
+from typing_extensions import deprecated
+
 import numpy as np
 import numpy.typing as npt
-from pymongo import MongoClient
-from dataclasses import dataclass
-from typing import List, Any, TypeVar, Callable, Type, cast
-from uuid import uuid4
-import os
+
+from dataclasses import dataclass, field
+from typing import Dict, List, Any, Tuple, TypeVar, Callable, Type, cast, Optional
 from dotenv import load_dotenv
 
-# dataclasses generated with Quicktype https://github.com/quicktype/quicktype
-# To use this code, make sure you
-#
-#     import json
-#
-# and then, to convert JSON from a string, do
-#
-#     result = scene_from_dict(json.loads(json_string))
-
-from dataclasses import dataclass
-from typing import Optional, Any, List, TypeVar, Callable, Type, cast
-import logging
-
-
-T = TypeVar("T")
 
 # Load environment variables from .env file at the root of the project
+T = TypeVar("T")
 load_dotenv()
+
 
 def from_str(x: Any) -> str:
     assert isinstance(x, str)
@@ -75,6 +71,99 @@ def to_class(c: Type[T], x: Any) -> dict:
 
 
 @dataclass
+class NerfV2:
+    """
+    Finished nerf training representation
+    """
+    model_file_paths: Optional[Dict[int, str]] = field(default_factory=dict)
+    splat_cloud_file_paths: Optional[Dict[int, str]] = field(default_factory=dict)
+    point_cloud_file_paths: Optional[Dict[int, str]] = field(default_factory=dict)
+    video_file_paths: Optional[Dict[int, str]] = field(default_factory=dict)
+    flag: Optional[int] = 0
+    
+    # Private immutable
+    _VALID_OUTPUT_TYPES: Tuple[str, ...] = field(default=(
+        "splat_cloud",
+        "point_cloud",
+        "video",
+        "model"
+    ), init=False, repr=False)
+
+    @staticmethod
+    def from_dict(obj: Any) -> 'NerfV2':
+        """
+        Converts a dictionary object to a Nerf instance.
+
+        Args:
+            obj (Any): The dictionary object to convert to a Nerf instance.
+        Returns:
+            Nerf: The converted Nerf instance.
+        """
+        assert isinstance(obj, dict)
+        model_file_paths = from_union([lambda x: {int(k): str(v) for k, v in x.items()}, from_none], obj.get("model_file_paths"))
+        splat_cloud_file_paths = from_union([lambda x: {int(k): str(v) for k, v in x.items()}, from_none], obj.get("splat_cloud_file_paths"))
+        point_cloud_file_paths = from_union([lambda x: {int(k): str(v) for k, v in x.items()}, from_none], obj.get("point_cloud_file_paths"))
+        video_file_paths = from_union([lambda x: {int(k): str(v) for k, v in x.items()}, from_none], obj.get("video_file_paths"))
+        flag = from_union([from_int, from_none], obj.get("flag"))
+        return NerfV2(model_file_paths, splat_cloud_file_paths, point_cloud_file_paths, video_file_paths, flag)
+
+    def to_dict(self) -> dict:
+        """
+        Converts the Scene object to a dictionary.
+
+        Returns:
+            dict: The dictionary representation of the Scene object.
+        """
+        result: dict = {}
+        result["model_file_paths"] = from_union([lambda x: {str(k): v for k, v in x.items()}, from_none], self.model_file_paths)
+        result["splat_cloud_file_paths"] = from_union([lambda x: {str(k): v for k, v in x.items()}, from_none], self.splat_cloud_file_paths)
+        result["point_cloud_file_paths"] = from_union([lambda x: {str(k): v for k, v in x.items()}, from_none], self.point_cloud_file_paths)
+        result["video_file_paths"] = from_union([lambda x: {str(k): v for k, v in x.items()}, from_none], self.video_file_paths)
+        result["flag"] = from_union([from_int, from_none], self.flag)
+        result = {k: v for k, v in result.items() if (v != None and v != {})}
+        return result
+    
+    @staticmethod
+    def empty_nerfV2() -> 'NerfV2':
+        """
+        Returns an empty NerfV2 object, with all fields initialized to empty values.
+
+        Returns:
+            NerfV2: The empty NerfV2 object.
+        """
+        nerf_v2 = NerfV2()
+        nerf_v2.model_file_paths = {}
+        nerf_v2.splat_cloud_file_paths = {}
+        nerf_v2.point_cloud_file_paths = {}
+        nerf_v2.video_file_paths = {}
+        nerf_v2.flag = 0
+        return nerf_v2    
+    
+    @classmethod
+    def get_empty(cls):
+        """
+        Generates deep copy of static empty NerfV2
+        
+        Returns:
+            TrainingConfig: Deepcopy of default config
+        """
+        return copy.deepcopy(cls.empty_nerfV2())
+    
+    @property
+    def VALID_OUTPUT_TYPES(self) -> Tuple[str, ...]:
+        return self._VALID_OUTPUT_TYPES
+    
+    @classmethod
+    def is_valid_output_type(cls, output_type: str) -> bool:
+        """
+        Checks if the given output type is a valid output type for the NerfV2 object
+        """
+        return output_type in cls.VALID_OUTPUT_TYPES
+
+
+
+@dataclass
+@deprecated("Legacy Code. Old TensoRF Nerf representation")
 class Nerf:
     model_file_path: Optional[str] = None
     splat_file_path: Optional[str] = None
@@ -103,20 +192,36 @@ class Nerf:
         result = {k:v for k,v in result.items() if v != None }
         return result
 
-
 @dataclass
 class Frame:
+    """
+    SfM Single frame representation
+    """
     file_path: Optional[str] = None
     extrinsic_matrix: Optional[npt.NDArray] = None
 
     @staticmethod
     def from_dict(obj: Any) -> 'Frame':
+        """
+        Converts a dictionary object to a Frame instance.
+
+        Args:
+            obj (Any): The dictionary object to convert to a Frame instance.
+        Returns:
+            Frame: The converted Frame instance.
+        """
         assert isinstance(obj, dict)
         file_path = from_union([from_str, from_none], obj.get("file_path"))
         extrinsic_matrix = np.array(from_union([lambda x: from_list(lambda x: from_list(from_float, x), x), from_none], obj.get("extrinsic_matrix")))
         return Frame(file_path, extrinsic_matrix)
 
     def to_dict(self) -> dict:
+        """
+        Converts the Frame object to a dictionary. Usually for JSON serialization.
+
+        Returns:
+            dict: The dictionary representation of the Frame object.
+        """
         result: dict = {}
         result["file_path"] = from_union([from_str, from_none], self.file_path)
         result["extrinsic_matrix"] = from_union([lambda x: from_list(lambda x: from_list(from_float, x), x), from_none], self.extrinsic_matrix.tolist())
@@ -128,17 +233,34 @@ class Frame:
 
 @dataclass
 class Sfm:
+    """
+    SfM representation of video
+    """
     intrinsic_matrix: Optional[npt.NDArray] = None
     frames: Optional[List[Frame]] = None
 
     @staticmethod
     def from_dict(obj: Any) -> 'Sfm':
+        """
+        Converts a dictionary object to a Sfm instance.
+
+        Args:
+            obj (Any): The dictionary object to convert to a Sfm instance.
+        Returns:
+            Sfm: The converted Sfm instance.
+        """
         assert isinstance(obj, dict)
         intrinsic_matrix = np.array(from_union([lambda x: from_list(lambda x: from_list(from_float, x), x), from_none], obj.get("intrinsic_matrix")))
         frames = from_union([lambda x: from_list(Frame.from_dict, x), from_none], obj.get("frames"))
         return Sfm(intrinsic_matrix, frames)
 
     def to_dict(self) -> dict:
+        """
+        Converts the Sfm object to a dictionary. Usually for JSON serialization.
+
+        Returns:
+            dict: The dictionary representation of the Sfm object.
+        """
         result: dict = {}
         result["intrinsic_matrix"] = from_union([lambda x: from_list(lambda x: from_list(from_float, x), x), from_none], self.intrinsic_matrix.tolist())
         result["frames"] = from_union([lambda x: from_list(lambda x: to_class(Frame, x), x), from_none], self.frames)
@@ -150,6 +272,9 @@ class Sfm:
 
 @dataclass
 class Video:
+    """
+    Video representation
+    """
     file_path: Optional[str] = None
     width: Optional[int] = None
     height: Optional[int] = None
@@ -159,6 +284,14 @@ class Video:
 
     @staticmethod
     def from_dict(obj: Any) -> 'Video':
+        """
+        Converts a dictionary object to a Video instance.
+                
+        Args:
+            obj (Any): The dictionary object to convert to a Video instance.
+        Returns:
+            Video: The converted Video instance.
+        """
         assert isinstance(obj, dict)
         file_path = from_union([from_str, from_none], obj.get("file_path"))
         width = from_union([from_int, from_none], obj.get("vid_width"))
@@ -169,6 +302,12 @@ class Video:
         return Video(file_path, width, height, fps, duration, frame_count)
 
     def to_dict(self) -> dict:
+        """
+        Converts the Video object to a dictionary. Usually for JSON serialization.
+
+        Returns:
+            dict: The dictionary representation of the Video object.
+        """
         result: dict = {}
         result["file_path"] = from_union([from_str, from_none], self.file_path)
         result["width"] = from_union([from_int, from_none], self.width)
@@ -182,19 +321,71 @@ class Video:
         return result
 
 
+# TODO: Probably add a bunch of static functions to generate default sfm_config, nerf_config, etc
+# TODO: Add default and deepcopy support
 @dataclass
-class SceneConfig:
-    sfm_config: Optional[dict] = None
-    nerf_config: Optional[dict] = None
+class TrainingConfig:
+    """
+    Dataclass containing all configuration details needed for per job
+    configuration for each worker.
+    """
+    sfm_config: Optional[dict[str, Any]] = None
+    nerf_config: Optional[dict[str, Any]] = None
 
     @staticmethod
-    def from_dict(obj: Any) -> 'SceneConfig':
+    def default_config() -> 'TrainingConfig':
+        """
+        Factory to generate a TrainingConfig with default worker configs
+
+        # TODO: Replace with actual default values once testing is done
+        Returns:
+            TrainingConfig: Default configuration 
+        """
+        return TrainingConfig(
+            sfm_config={
+                # Add more default SfM parameters as needed
+            },
+            nerf_config={
+                "training_mode" : "gaussian",
+                "output_types" : ['splat_cloud'],
+                "save_iterations" : [7000, 30000],
+                "total_iterations" : 30000
+                # Add more default NeRF parameters as needed
+            }
+        )
+
+    @classmethod
+    def get_default(cls):
+        """
+        Generates deep copy of static default training config
+        
+        Returns:
+            TrainingConfig: Deepcopy of default config
+        """
+        return copy.deepcopy(cls.default_config())
+
+    @staticmethod
+    def from_dict(obj: Any) -> 'TrainingConfig':
+        """
+        Converts a dictionary object to a TrainingConfig instance.
+
+        Args:
+            obj (Any): The dictionary object to convert to a TrainingConfig instance.
+        Returns:
+            TrainingConfig: The converted TrainingConfig instance.
+        """
         assert isinstance(obj, dict)
         sfm_config = from_union([from_dict, from_none], obj.get("sfm_config"))
         nerf_config = from_union([from_dict, from_none], obj.get("nerf_config"))
-        return SceneConfig(sfm_config, nerf_config)
+        return TrainingConfig(sfm_config, nerf_config)
 
     def to_dict(self) -> dict:
+        """
+        Converts the TrainingConfig object to a dictionary. Usually for JSON serialization.
+
+        Returns:
+            dict: The dictionary representation of the TrainingConfig object.
+        """
         result: dict = {}
         if self.sfm_config is not None:
             result["sfm_config"] = from_union([from_dict, from_none], self.sfm_config)
@@ -202,35 +393,64 @@ class SceneConfig:
             result["nerf_config"] = from_union([from_dict, from_none], self.nerf_config)
         return result
 
+    def update(self, new_config: dict):
+        """
+        Update the current TrainingConfig object with new configuration details
+
+        Args:
+            new_config (dict): The new configuration details to update the current object with
+        """
+        if "sfm_config" in new_config:
+            self.sfm_config.update(new_config["sfm_config"])
+        if "nerf_config" in new_config:
+            self.nerf_config.update(new_config["nerf_config"])
 
 @dataclass
 class Scene:
+    """
+    Scene representation. Contains all information about a scene from all
+    stages of training pipeline
+    """
     id: Optional[str] = None
     status: Optional[int] = None
     video: Optional[Video] = None
     sfm: Optional[Sfm] = None
-    nerf: Optional[Nerf] = None
-    config: Optional[SceneConfig] = None 
+    nerf: Optional[NerfV2] = None
+    config: Optional[TrainingConfig] = None 
 
     @staticmethod
     def from_dict(obj: Any) -> 'Scene':
+        """
+        Converts a dictionary object to a Scene instance.
+
+        Args:
+            obj (Any): The dictionary object to convert to a Scene instance.
+        Returns:
+            Scene: The converted Scene instance.
+        """
         assert isinstance(obj, dict)
         id = from_union([from_str, from_none], obj.get("id"))
         status = from_union([from_int, from_none], obj.get("status"))
         video = from_union([Video.from_dict, from_none], obj.get("video"))
         sfm = from_union([Sfm.from_dict, from_none], obj.get("sfm"))
-        nerf = from_union([Nerf.from_dict, from_none], obj.get("nerf"))
-        config = from_union([SceneConfig.from_dict, from_none], obj.get("config"))
-        return Scene(id, status, video, sfm, nerf)
+        nerf = from_union([NerfV2.from_dict, from_none], obj.get("nerf"))
+        config = from_union([TrainingConfig.from_dict, from_none], obj.get("config"))
+        return Scene(id, status, video, sfm, nerf, config)
 
     def to_dict(self) -> dict:
+        """
+        Converts the Scene object to a dictionary. Usually for JSON serialization.
+
+        Returns:
+            dict: The dictionary representation of the Scene object.
+        """
         result: dict = {}
         result["id"] = from_union([from_str, from_none], self.id)
         result["status"] = from_union([from_int, from_none], self.status)
         result["video"] = from_union([lambda x: to_class(Video, x), from_none], self.video)
         result["sfm"] = from_union([lambda x: to_class(Sfm, x), from_none], self.sfm)
-        result["nerf"] = from_union([lambda x: to_class(Nerf, x), from_none], self.nerf)
-        result["config"] = from_union([lambda x: to_class(SceneConfig, x), from_none], self.config)
+        result["nerf"] = from_union([lambda x: to_class(NerfV2, x), from_none], self.nerf)
+        result["config"] = from_union([lambda x: to_class(TrainingConfig, x), from_none], self.config)
 
         #ignore null
         result = {k:v for k,v in result.items() if v}
@@ -238,16 +458,40 @@ class Scene:
 
 
 def scene_from_dict(s: Any) -> Scene:
+    """
+    Non-Statically converts a dictionary object to a Scene instance. 
+
+    Args:
+        s (Any): The dictionary object to convert to a Scene instance.
+
+    Returns:
+        Scene: The converted Scene instance.
+    """
     return Scene.from_dict(s)
 
 
 def scene_to_dict(x: Scene) -> Any:
+    """
+    Non-Statically converts a Scene instance to a dictionary.
+
+    Args:
+        x (Scene): The Scene instance to convert to a dictionary.
+
+    Returns:
+        Any: The dictionary representation of the Scene instance.
+    """
     return to_class(Scene, x)
 
 
-
+# TODO: Find a use for these
 @dataclass
 class Worker:
+    """
+    Worker representation. Most likely would be used to help
+    manage user access to workers when multiple of each type exist.
+    For instance, free tier users should have a lot less compute limit
+    than paid (ik this is FOSS just an example)
+    """
     id: Optional[str] = None
     api_key: Optional[str] = None
     owner_id: Optional[str] = None
@@ -255,6 +499,14 @@ class Worker:
 
     @staticmethod
     def from_dict(obj: Any) -> 'Worker':
+        """
+        Converts a dictionary object to a Worker instance
+
+        Args:
+            obj (Any): The dictionary object to convert to a Worker instance.
+        Returns:
+            Worker: The converted Worker instance.
+        """
         assert isinstance(obj, dict)
         id = from_union([from_str, from_none], obj.get("_id"))
         api_key = from_union([from_str, from_none], obj.get("api_key"))
@@ -263,6 +515,12 @@ class Worker:
         return Worker(id, api_key, owner_id, type)
 
     def to_dict(self) -> dict:
+        """
+        Converts the Worker object to a dictionary. Usually for JSON serialization.
+
+        Returns:
+            dict: The dictionary representation of the Worker object.
+        """
         result: dict = {}
         if self.id is not None:
             result["_id"] = from_union([from_str, from_none], self.id)
@@ -276,18 +534,39 @@ class Worker:
 
 
 def worker_from_dict(s: Any) -> Worker:
+    """
+    Non-Statically converts a dictionary object to a Worker instance.
+
+    Args:
+        s (Any): The dictionary object to convert to a Worker instance.
+    Returns:
+        Worker: The converted Worker instance.
+    """
     return Worker.from_dict(s)
 
 
 def worker_to_dict(x: Worker) -> Any:
+    """
+    Non-Statically converts a Worker instance to a dictionary
+
+    Args:
+        x (Worker): The Worker instance to convert to a dictionary.
+    Returns:
+        Any: The dictionary representation of the Worker instance.
+    """
     return to_class(Worker, x)
 
 
-
-
 # api_key owner
+# TODO: Desperately needs better password handling. Should probably invest in salting and hashing passwords. Look into https://en.wikipedia.org/wiki/PBKDF2
+# TODO: Specific password objects, or at least a password hashing function
 @dataclass
 class User:
+    """
+    User representation. Would be used to manage user access to completed scenes,
+    specific workers, and other user-specific data. Stores list of scenes generated
+    by user, as well as workers owned by user.
+    """
     username: Optional[str] = None
     password: Optional[str] = None
     _id: Optional[str] = None
@@ -297,6 +576,14 @@ class User:
 
     @staticmethod
     def from_dict(obj: Any) -> 'User':
+        """
+        Converts a dictionary object to a User instance
+
+        Args:
+            obj (Any): The dictionary object to convert to a User instance.
+        Returns:
+            User: The converted User instance.
+        """
         assert isinstance(obj, dict)
         username = from_union([from_str, from_none], obj.get("username"))
         password = from_union([from_str, from_none], obj.get("password"))
@@ -307,6 +594,12 @@ class User:
         return User(username, password, _id, api_key, scenes, workers_owned)
 
     def to_dict(self) -> dict:
+        """
+        Converts the User object to a dictionary. Usually for JSON serialization.
+
+        Returns:
+            dict: The dictionary representation of the User object.
+        """
         result: dict = {}
         if self.username is not None:
             result["username"] = from_union([from_str, from_none], self.username)
@@ -325,239 +618,65 @@ class User:
 
 
 def user_from_dict(s: Any) -> User:
+    """
+    Non-Statically converts a dictionary object to a User instance.
+
+    Args:
+        s (Any): The dictionary object to convert to a User instance.
+
+    Returns:
+        User: The converted User instance.
+    """
     return User.from_dict(s)
 
 
 def user_to_dict(x: User) -> Any:
+    """
+    Non-Statically converts a User instance to a dictionary
+
+    Args:
+        x (User): The User instance to convert to a dictionary.
+
+    Returns:
+        Any: The dictionary representation of the User instance.
+    """
     return to_class(User, x)
 
 # QueueList manages list of ids
 @dataclass
 class QueueList:
+    """
+    QueueList manages a list of job ids for a certain queue. Used for reporting
+    the current job progress to the user.
+    """
     _id: Optional[str] = None
     queue: Optional[List[str]] = None
 
     @staticmethod
     def from_dict(obj: Any) -> 'QueueList':
+        """
+        Converts a dictionary object to a QueueList instance
+
+        Args:
+            obj (Any): The dictionary object to convert to a QueueList instance.
+        Returns:
+            QueueList: The converted QueueList instance.
+        """
         assert isinstance(obj, dict)
         _id = from_union([from_str, from_none], obj.get("_id"))
         queue = from_union([lambda x:from_list(from_str,x),from_none],obj.get("queue"))
         return QueueList(_id,queue)
 
     def to_dict(self) -> dict:
+        """
+        Converts the QueueList object to a dictionary. Usually for JSON serialization.
+
+        Returns:
+            dict: The dictionary representation of the QueueList object.
+        """
         result: dict = {}
         if self._id is not None:
             result["_id"] = from_union([from_str, from_none], self._id)
         if self.queue is not None:
             result["queue"] = from_union([lambda x: from_list(from_str, x), from_none], self.queue)
         return result
-
-# QueueListManager keeps track of lists (queues) in parallel with RabbitMQ to report queue status
-# VALID QUEUE IDS: sfm_list nerf_list queue_lit (queue_list is the overarching process)
-class QueueListManager:
-    def __init__(self, unittest=False) -> None:
-        # unittest=True implies this runs on localhost for unit testing
-        mongoip = "localhost" if unittest else str(os.getenv("MONGO_IP"))
-        client = MongoClient(host=mongoip,port=27017,username=str(os.getenv("MONGO_INITDB_ROOT_USERNAME")),\
-                             password=str(os.getenv("MONGO_INITDB_ROOT_PASSWORD")))
-        self.db = client["nerfdb"]
-        self.collection = self.db["queues"]
-        self.upsert=True
-        # Valid queue ids:
-        self.queue_names = ["sfm_list","nerf_list","queue_list"]
-
-    # Set a queue list
-    def __set_queue(self, _id: str, queue_list: QueueList):
-        if _id not in self.queue_names:
-            raise Exception("Not a valid queue ID. Valid queue IDs: {}".format(self.queue_names))
-        key = {"_id":_id}
-        value = {"$set": queue_list.to_dict()}
-        self.collection.update_one(key, value, upsert=self.upsert)
-
-    # Append a uuid to the queue list
-    def append_queue(self, queueid: str, uuid: str):
-        # Check for valid queue id
-        if queueid not in self.queue_names:
-            raise Exception("Not a valid queue ID. Valid queue IDs: {}".format(self.queue_names))
-        # Create queue or add to existing queue
-        doc = self.collection.find_one(queueid)
-        if not doc:
-            self.__set_queue(queueid,QueueList(queueid,[uuid]))
-        else:
-            queue_list = QueueList.from_dict(doc)
-            # Make sure ID is not in list already
-            x = [x for x in queue_list.queue if x == uuid]
-            if len(x) > 0:
-                raise Exception("ID is already in the queue!")
-            # Append queue
-            queue_list.queue.append(uuid)
-            self.__set_queue(queueid,queue_list)
-
-    # Get a position in the queue list
-    def get_queue_position(self, queueid: str, uuid: str) -> 'tuple[int,int]':
-        # Check for valid queue id
-        if queueid not in self.queue_names:
-            raise Exception("Not a valid queue ID. Valid queue IDs: {}".format(self.queue_names))
-        doc = self.collection.find_one(queueid)
-        queue_list = QueueList.from_dict(doc)
-        # Obtain indices of all occurences of the uuid
-        x = [x for x in range(0,len(queue_list.queue)) if queue_list.queue[x] == uuid]
-        if len(x) > 1:
-            raise Exception("Same ID found multiple times in queue!")
-        elif len(x) == 0:
-            raise Exception("ID not found in queue!")
-        else:
-            return (x[0], len(queue_list.queue))
-    
-    # Returns the size of a queue
-    def get_queue_size(self, queueid: str) -> int:
-        if queueid not in self.queue_names:
-            raise Exception("Not a valid queue ID. Valid queue IDs: {}".format(self.queue_names))
-        doc = self.collection.find_one(queueid)
-        queue_list = QueueList.from_dict(doc)
-        return len(queue_list.queue)
-    
-    # Pops either a given uuid or the first uuid of a list
-    def pop_queue(self, queueid: str, uuid: str=None):
-        # Check if valid queue id
-        if queueid not in self.queue_names:
-            raise Exception("Not a valid queue ID. Valid queue IDs: {}".format(self.queue_names))
-        doc = self.collection.find_one(queueid)
-        queue_list = QueueList.from_dict(doc)
-        # Check that the uuid exists or no uuid was provided
-        if len(queue_list.queue) == 0 or (uuid and uuid not in queue_list.queue):
-            raise Exception("Queue empty or ID not found!")
-        if uuid:
-            queue_list.queue.remove(uuid)
-        else:
-            queue_list.queue.pop(0)
-        self.__set_queue(queueid, queue_list)
-
-
-class SceneManager:
-    def __init__(self) -> None:
-        client = MongoClient(host=str(os.getenv("MONGO_IP")),port=27017,username=str(os.getenv("MONGO_INITDB_ROOT_USERNAME")),\
-                             password=str(os.getenv("MONGO_INITDB_ROOT_PASSWORD")))
-        self.db = client["nerfdb"]
-        self.collection = self.db["scenes"]
-        self.upsert=True
-    
-    #TODO: define set update get and delete for each object 
-    # adds scene to the collection replacing any existing scene with the same id
-    # TODO: 
-    # TODO: add worker configs per job, so that dynamic training/output modes
-    # can be supports
-    def set_job_config(self, _id: str, config: SceneConfig):
-        pass
-    
-    def set_scene(self, _id: str, scene: Scene):
-        key = {"_id": _id}
-        value = {"$set": scene.to_dict()}
-        self.collection.update_one(key, value, upsert=self.upsert)
-
-    def set_video(self, _id: str, vid: Video):
-        key = {"_id":_id}
-        fields = {"video."+k:v for k,v in vid.to_dict().items()}
-        value = {"$set": fields}
-        self.collection.update_one(key, value, upsert=self.upsert)
-
-    def set_sfm(self, _id: str, sfn: Sfm):
-        key = {"_id":_id}
-        fields = {"sfm."+k:v for k,v in sfn.to_dict().items()}
-        value = {"$set": fields}
-        self.collection.update_one(key, value, upsert=self.upsert)
-
-    def set_nerf(self, _id: str, nerf: Nerf):
-        key = {"_id":_id}
-        fields = {"nerf."+k:v for k,v in nerf.to_dict().items()}
-        value = {"$set": fields}
-        self.collection.update_one(key, value, upsert=self.upsert)
-
-    def get_scene(self, _id: str) -> Scene:
-        key = {"_id":_id}
-        doc = self.collection.find_one(key)
-        if doc:
-            return scene_from_dict(doc)
-        else:
-            return None
-
-    def get_video(self, _id: str) -> Video:
-        key = {"_id":_id}
-        doc = self.collection.find_one(key)
-        if doc and "video" in doc:
-            return Video.from_dict(doc["video"])
-        else:
-            return None
-
-    def get_sfm(self, _id: str) -> Sfm:
-        key = {"_id":_id}
-        doc = self.collection.find_one(key)
-        if doc and "sfm" in doc:
-            return Sfm.from_dict(doc["sfm"])
-        else:
-            return None
-    
-    def get_nerf(self, _id: str) -> Nerf:
-        key = {"_id":_id}
-        doc = self.collection.find_one(key)
-        if doc and "nerf" in doc:
-            return Nerf.from_dict(doc["nerf"])
-        else:
-            return None
-        
-
-class UserManager:
-    def __init__(self,unittest=False) -> None:
-        # unittest=True implies this runs on localhost for unit testing
-        mongoip = "localhost" if unittest else str(os.getenv("MONGO_IP"))
-        client = MongoClient(host=mongoip,port=27017,username=str(os.getenv("MONGO_INITDB_ROOT_USERNAME")),\
-                             password=str(os.getenv("MONGO_INITDB_ROOT_PASSWORD")))
-        self.db = client["nerfdb"]
-        self.collection = self.db["users"]
-        self.upsert=True
-
-
-    def set_user(self, user:User):  #usernames and ids are forced to be unique, passwords are not
-        key={"username":user.username}
-        doc = self.collection.find_one(key)
-        if doc!=None:
-            #Two users assigned with same username
-            return 1
-        key={"_id":user._id}
-        doc = self.collection.find_one(key)
-        if doc!=None:
-            raise Exception('Two users assigned with same ID!')
-        user.password=str(hash(user.password))
-
-        value = {"$set": user.to_dict()}
-        self.collection.update_one(key,value,upsert=self.upsert)
-        return 0
-
-    def generate_user(self, username:str, password:str):
-        _id = str(uuid4())
-        user=User(username,password,_id)
-        errorcode=self.set_user(user)
-        if(errorcode!=0):
-            return errorcode
-            
-        return user
-            
-
-    def get_user_by_id(self, _id: str) -> User:
-        key = {"_id":_id}
-        doc = self.collection.find_one(key)
-        if doc:
-            return User.from_dict(doc)
-        else:
-            return None
-
-    def get_user_by_username(self, username: str) -> User:
-        key = {"username":username}
-        doc = self.collection.find_one(key)
-        if doc:
-            return User.from_dict(doc)
-        else:
-            return None
-    #TODO: Write an overloaded function for finding users by username
-         
-

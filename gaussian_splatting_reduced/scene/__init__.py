@@ -8,7 +8,7 @@
 #
 # For inquiries contact  george.drettakis@inria.fr
 #
-
+import logging
 import os
 import random
 import json
@@ -26,16 +26,18 @@ class Scene:
         """b
         :param path: Path to colmap scene main folder.
         """
+        self.uuid = args.uuid
         self.model_path = args.model_path
         self.loaded_iter = None
         self.gaussians = gaussians
+        self.logger = logging.getLogger("nerf-worker-dispatcher")
 
         if load_iteration:
             if load_iteration == -1:
                 self.loaded_iter = searchForMaxIteration(os.path.join(self.model_path, "point_cloud"))
             else:
                 self.loaded_iter = load_iteration
-            print("Loading trained model at iteration {}".format(self.loaded_iter))
+            self.logger.info("Loading trained model at iteration {}".format(self.loaded_iter))
 
         self.train_cameras = {}
         self.test_cameras = {}
@@ -43,7 +45,7 @@ class Scene:
         if os.path.exists(os.path.join(args.source_path, "sparse")):
             scene_info = sceneLoadTypeCallbacks["Colmap"](args.source_path, args.images, args.eval)
         elif os.path.exists(os.path.join(args.source_path, "transforms_train.json")):
-            print("Found transforms_train.json file, assuming Blender data set!")
+            self.logger.info("Found transforms_train.json file, assuming Blender data set!")
             scene_info = sceneLoadTypeCallbacks["Blender"](args.source_path, args.white_background, args.eval)
         else:
             assert False, "Could not recognize scene type!"
@@ -69,9 +71,8 @@ class Scene:
         self.cameras_extent = scene_info.nerf_normalization["radius"]
 
         for resolution_scale in resolution_scales:
-            print("Loading Training Cameras")
+            self.logger.info("Loading cameras for resolution scale {}".format(resolution_scale))
             self.train_cameras[resolution_scale] = cameraList_from_camInfos(scene_info.train_cameras, resolution_scale, args)
-            print("Loading Test Cameras")
             self.test_cameras[resolution_scale] = cameraList_from_camInfos(scene_info.test_cameras, resolution_scale, args)
 
         if self.loaded_iter:
@@ -84,7 +85,8 @@ class Scene:
 
     def save(self, iteration):
         point_cloud_path = os.path.join(self.model_path, "point_cloud/iteration_{}".format(iteration))
-        self.gaussians.save_ply(os.path.join(point_cloud_path, "point_cloud.ply"))
+        self.logger.info("Scene: Saving point cloud at {}".format(os.path.join(point_cloud_path, f"{self.uuid}.ply")))
+        self.gaussians.save_ply(os.path.join(point_cloud_path, f"{self.uuid}.ply"))
 
     def getTrainCameras(self, scale=1.0):
         return self.train_cameras[scale]

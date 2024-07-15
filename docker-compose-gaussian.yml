@@ -80,7 +80,7 @@ services:
         - ./gaussian_splatting_reduced:/gaussian_splatting_reduced
       
       ports: 
-        - 5201:5201
+        - 5200:5200
       networks:
         - backend
       command: ./entry_point.sh
