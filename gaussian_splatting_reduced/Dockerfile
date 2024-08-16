@@ -12,9 +12,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # libc6 updates glibc to 2.31 (newest compatible version with 20.04)
 
 # Copy source code
+WORKDIR /app
 COPY requirements.txt .
-COPY . /gaussian_splatting_reduced
-WORKDIR /gaussian_splatting_reduced
 
 # Install dependencies (must get older python from non-default repo)
 RUN add-apt-repository ppa:deadsnakes/ppa \
@@ -34,6 +33,7 @@ RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.8 1 \
 # Install Python dependencies
 RUN pip install -r requirements.txt
 
-# Allow entry_point.sh to be executable
-RUN ["chmod", "+x", "./entry_point.sh"]
-# RUN ["chmod", "+x", "./entry_point2.sh"] 
+COPY . . 
+
+# Allow build_dependencies_and_start.sh to be executable
+RUN ["chmod", "+x", "./build_dependencies_and_start.sh"]

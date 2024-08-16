@@ -23,19 +23,21 @@ import requests
 import train
 import time
 import os
+import traceback
 
 from log import nerf_worker_logger
 from utils import nerf_utils, output_utils
+
 from uuid import UUID
 from queue import Queue
 from pathlib import Path
 from dotenv import load_dotenv
-from typing import Any, List, Optional, Tuple
+from typing import List, Optional
 
 
 # Globals
 base_url = "http://nerf-worker:5200/"
-
+cert_path = '/app/secrets/cert.pem' # Local Self-Signed Cert Path
 
 class GaussianJobDispatcher:
     """
@@ -213,18 +215,16 @@ class GaussianJobDispatcher:
         try:
             # Read job details, convert transforms, and parse into fields.
             job_data = json.loads(body.decode())
+            
             job_data_converted = nerf_utils.convert_transforms_to_gaussian(
                 job_data)
+            
             id, output_types, save_iterations, total_iterations, error =\
                 self.parse_job(job_data_converted)
 
             # Invalid job configuration
             if error:
-                self.ack_publish_message(channel, delivery_tag, json.dumps({
-                    "id": id if id else "None",
-                    "error": error
-                }))
-                return
+                raise Exception(f"Invalid job configuration: {error}")
 
             # Retrieve images from sfm
             input_dir: Path = Path("data/sfm") / id
@@ -233,8 +233,10 @@ class GaussianJobDispatcher:
             os.makedirs(output_dir, exist_ok=True)
 
             for i, fr in enumerate(job_data_converted["frames"]):
+                print("fp", fr["file_path"], flush=True)
+                fr["file_path"] = fr["file_path"].replace('host.docker.internal', 'web-server')
                 url = fr["file_path"]
-                img = requests.get(url)
+                img = requests.get(url, verify = cert_path)
                 fr["file_path"] = f"{i}.png"
                 img_file_path = input_dir / fr["file_path"]
                 img_file_path.write_bytes(img.content)
@@ -243,6 +245,7 @@ class GaussianJobDispatcher:
             input_test = input_dir / "transforms_test.json"
             input_train.write_text(json.dumps(job_data_converted, indent=4))
             input_test.write_text(json.dumps(job_data_converted, indent=4))
+            
             self.logger.info(f"Running nerf job for {id}, delivery tag {delivery_tag}")
             self.logger.info(f"Input directory: {input_dir}")
 
@@ -252,7 +255,8 @@ class GaussianJobDispatcher:
                 "--model_path", str(output_dir),
                 "--save_iterations", *map(str, save_iterations),
                 "--iterations", f"{total_iterations}",
-                "--job_id", id
+                "--job_id", id,
+                "--white_background" if job_data_converted["white_background"] else ""
             ]
             self.logger.info(f"Train_args {train_args}")
             
@@ -285,11 +289,13 @@ class GaussianJobDispatcher:
                 "id": id if id else "None",
                 "error": f"Error in GaussianJobDispatcher: {e}"
             }
+            print('Error: ', error_dict, flush=True)
+            print("Traceback: ", traceback.format_exc(), flush=True)
             self.logger.exception("Error occurred during training: %s", error_dict["error"])
 
-            ack_callback = functools.partial(
-                self.ack_publish_message, channel, delivery_tag, json.dumps(error_dict))
-            channel.connection.add_callback_threadsafe(ack_callback)
+            # ack_callback = functools.partial(
+            #     self.ack_publish_message, channel, delivery_tag, json.dumps(error_dict))
+            # channel.connection.add_callback_threadsafe(ack_callback)
 
     def validate_job(self, id, output_types, save_iterations, total_iterations) -> Optional[str]:
         """

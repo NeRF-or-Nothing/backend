@@ -4,22 +4,36 @@ TrainingConfig, Worker, User, and QueueList representations. These dataclasses
 are used to represent the data in the database and are used to serialize and
 deserialize the data to and from JSON. QueueList is used to manage the list of
 job ids for a certain queue.
+
+TODO: Remove redundant extrapolations of from_dict and to_dict
 """
 
 import copy
 from typing_extensions import deprecated
+import bcrypt
 
 import numpy as np
 import numpy.typing as npt
 
+from cryptography.fernet import Fernet
 from dataclasses import dataclass, field
-from typing import Dict, List, Any, Tuple, TypeVar, Callable, Type, cast, Optional
+from typing import ClassVar, Dict, List, Any, Set, Tuple, TypeVar, Callable, Type, cast, Optional
 from dotenv import load_dotenv
 
 
 # Load environment variables from .env file at the root of the project
 T = TypeVar("T")
 load_dotenv()
+
+
+def from_bytes(x: Any) -> bytes:
+    assert isinstance(x, bytes)
+    return x
+
+
+def from_bool(x: Any) -> bool:
+    assert isinstance(x, bool)
+    return x
 
 
 def from_str(x: Any) -> str:
@@ -50,6 +64,9 @@ def from_list(f: Callable[[Any], T], x: Any) -> List[T]:
     assert isinstance(x, list)
     return [f(y) for y in x]
 
+def from_set(f: Callable[[Any], T], x: Any) -> Set[T]:
+    assert isinstance(x, set)
+    return {f(y) for y in x}
 
 def from_int(x: Any) -> int:
     assert isinstance(x, int) and not isinstance(x, bool)
@@ -80,14 +97,6 @@ class NerfV2:
     point_cloud_file_paths: Optional[Dict[int, str]] = field(default_factory=dict)
     video_file_paths: Optional[Dict[int, str]] = field(default_factory=dict)
     flag: Optional[int] = 0
-    
-    # Private immutable
-    _VALID_OUTPUT_TYPES: Tuple[str, ...] = field(default=(
-        "splat_cloud",
-        "point_cloud",
-        "video",
-        "model"
-    ), init=False, repr=False)
 
     @staticmethod
     def from_dict(obj: Any) -> 'NerfV2':
@@ -109,7 +118,7 @@ class NerfV2:
 
     def to_dict(self) -> dict:
         """
-        Converts the Scene object to a dictionary.
+        Converts the Scene representation to a dictionary.
 
         Returns:
             dict: The dictionary representation of the Scene object.
@@ -149,17 +158,27 @@ class NerfV2:
         """
         return copy.deepcopy(cls.empty_nerfV2())
     
-    @property
-    def VALID_OUTPUT_TYPES(self) -> Tuple[str, ...]:
-        return self._VALID_OUTPUT_TYPES
-    
+    # "Private" static immutables
+    VALID_OUTPUT_TYPES: ClassVar[Dict[str, List[str]]] = {
+        "gaussian": ["splat_cloud", "point_cloud", "video"],
+        "tensorf": ["model", "video"]
+    }
+
+    VALID_TRAINING_MODES: ClassVar[Tuple[str, ...]] = ("gaussian", "tensorf")
+
     @classmethod
-    def is_valid_output_type(cls, output_type: str) -> bool:
+    def is_valid_output_type(cls, training_mode: str, output_type: str) -> bool:
         """
         Checks if the given output type is a valid output type for the NerfV2 object
         """
-        return output_type in cls.VALID_OUTPUT_TYPES
-
+        return output_type in cls.VALID_OUTPUT_TYPES[training_mode]
+    
+    @classmethod
+    def is_valid_training_mode(cls, training_mode: str) -> bool:
+        """
+        Checks if the given training mode is a valid training mode for the NerfV2 object
+        """
+        return training_mode in cls.VALID_TRAINING_MODES
 
 
 @dataclass
@@ -238,6 +257,7 @@ class Sfm:
     """
     intrinsic_matrix: Optional[npt.NDArray] = None
     frames: Optional[List[Frame]] = None
+    white_background: Optional[bool] = None
 
     @staticmethod
     def from_dict(obj: Any) -> 'Sfm':
@@ -252,7 +272,8 @@ class Sfm:
         assert isinstance(obj, dict)
         intrinsic_matrix = np.array(from_union([lambda x: from_list(lambda x: from_list(from_float, x), x), from_none], obj.get("intrinsic_matrix")))
         frames = from_union([lambda x: from_list(Frame.from_dict, x), from_none], obj.get("frames"))
-        return Sfm(intrinsic_matrix, frames)
+        white_background = from_union([from_bool, from_none], obj.get("white_background"))
+        return Sfm(intrinsic_matrix, frames, white_background)
 
     def to_dict(self) -> dict:
         """
@@ -264,8 +285,9 @@ class Sfm:
         result: dict = {}
         result["intrinsic_matrix"] = from_union([lambda x: from_list(lambda x: from_list(from_float, x), x), from_none], self.intrinsic_matrix.tolist())
         result["frames"] = from_union([lambda x: from_list(lambda x: to_class(Frame, x), x), from_none], self.frames)
+        result["white_background"] = from_union([from_bool, from_none], self.white_background)
 
-        #ingnore null
+        #ignore null
         result = {k:v for k,v in result.items() if v}
         return result
 
@@ -321,13 +343,15 @@ class Video:
         return result
 
 
-# TODO: Probably add a bunch of static functions to generate default sfm_config, nerf_config, etc
-# TODO: Add default and deepcopy support
+
 @dataclass
 class TrainingConfig:
     """
     Dataclass containing all configuration details needed for per job
     configuration for each worker.
+    
+    # TODO: Probably add a bunch of static functions to generate default sfm_config, nerf_config, etc
+    # TODO: DONE 7/26/24 Add default and deepcopy support
     """
     sfm_config: Optional[dict[str, Any]] = None
     nerf_config: Optional[dict[str, Any]] = None
@@ -346,11 +370,11 @@ class TrainingConfig:
                 # Add more default SfM parameters as needed
             },
             nerf_config={
+                # Add more default NeRF parameters  as needed
                 "training_mode" : "gaussian",
                 "output_types" : ['splat_cloud'],
                 "save_iterations" : [7000, 30000],
                 "total_iterations" : 30000
-                # Add more default NeRF parameters as needed
             }
         )
 
@@ -417,7 +441,7 @@ class Scene:
     sfm: Optional[Sfm] = None
     nerf: Optional[NerfV2] = None
     config: Optional[TrainingConfig] = None 
-
+    
     @staticmethod
     def from_dict(obj: Any) -> 'Scene':
         """
@@ -566,13 +590,48 @@ class User:
     User representation. Would be used to manage user access to completed scenes,
     specific workers, and other user-specific data. Stores list of scenes generated
     by user, as well as workers owned by user.
+    
+    TODO: Move to separate file
+    TODO: Salt and hash passwords with bcrypt (1 way)
+    TODO: Reimplement workers_owned functionality
     """
+    # Plaintext
     username: Optional[str] = None
-    password: Optional[str] = None
     _id: Optional[str] = None
-    api_key: Optional[str] = None
-    scenes: Optional[List[str]] = None
-    workers_owned: Optional[List[str]] = None
+    scene_ids: Set[str] = field(default_factory=set) # Sets for use, stored as list, need to convert each time
+    # Encrypted
+    encrypted_password: Optional[str] = None
+    
+    def set_password(self, password: str):
+        """
+        Set new password; salted and hashed with bcrypt.
+        Stored as string of bytes
+
+        Args:
+            password (str): plaintext password
+        """
+        salt = bcrypt.gensalt()
+        self.encrypted_password = bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
+
+    def check_password(self, password: str) -> bool:
+        """
+        Check if password is correct. Hashes and compares with stored hash
+        
+        Args:
+            password (str): plaintext password
+        Returns:
+            bool: True if equal
+        """
+        return bcrypt.checkpw(password.encode('utf-8'), self.encrypted_password.encode('utf-8'))
+
+    def add_scene(self, scene_id: str):
+        """
+        Add scene to user's scene_ids
+
+        Args:
+            scene_id (str): scene id to add
+        """
+        self.scene_ids.add(scene_id)
 
     @staticmethod
     def from_dict(obj: Any) -> 'User':
@@ -586,12 +645,10 @@ class User:
         """
         assert isinstance(obj, dict)
         username = from_union([from_str, from_none], obj.get("username"))
-        password = from_union([from_str, from_none], obj.get("password"))
         _id = from_union([from_str, from_none], obj.get("_id"))
-        api_key = from_union([from_str, from_none], obj.get("api_key"))
-        scenes = from_union([lambda x: from_list(from_str, x), from_none], obj.get("scenes"))
-        workers_owned = from_union([lambda x: from_list(from_str, x), from_none], obj.get("workers_owned"))
-        return User(username, password, _id, api_key, scenes, workers_owned)
+        scene_ids = set(from_union([lambda x: from_list(from_str, x), lambda _: []], obj.get("scene_ids")))
+        encrypted_password = from_union([from_str, from_none], obj.get("encrypted_password"))
+        return User(username, _id, scene_ids, encrypted_password)
 
     def to_dict(self) -> dict:
         """
@@ -603,16 +660,14 @@ class User:
         result: dict = {}
         if self.username is not None:
             result["username"] = from_union([from_str, from_none], self.username)
-        if self.password is not None:
-            result["password"] = from_union([from_str, from_none], self.password)
+        if self.encrypted_password is not None:
+            result["encrypted_password"] = from_union([from_str, from_none], self.encrypted_password)
         if self._id is not None:
             result["_id"] = from_union([from_str, from_none], self._id)
-        if self.api_key is not None:
-            result["api_key"] = from_union([from_str, from_none], self.api_key)
-        if self.scenes is not None:
-            result["scenes"] = from_union([lambda x: from_list(from_str, x), from_none], self.scenes)
-        if self.workers_owned is not None:
-            result["workers_owned"] = from_union([lambda x: from_list(from_str, x), from_none], self.workers_owned)
+        if self.scene_ids:
+            result["scene_ids"] = from_union([lambda x: list(x), from_none], self.scene_ids)
+        # if self.workers_owned is not None:
+        #     result["workers_owned"] = from_union([lambda x: from_list(from_str, x), from_none], self.workers_owned)
 
         return result
 

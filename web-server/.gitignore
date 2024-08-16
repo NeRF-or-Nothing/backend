@@ -4,3 +4,5 @@ data/sfm/*
 data/nerf/*
 Pipfile
 *.log
+!/secrets/.env.example
+/secrets/*

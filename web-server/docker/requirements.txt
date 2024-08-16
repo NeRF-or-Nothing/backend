@@ -8,3 +8,9 @@ python-dotenv
 scikit-learn==1.2.2
 kneed
 typing_extensions
+bcrypt
+pyjwt
+cryptography
+flask_cors
+flask_sslify
+flask_jwt_extended

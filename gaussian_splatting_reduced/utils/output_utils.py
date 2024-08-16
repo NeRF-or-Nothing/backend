@@ -4,13 +4,11 @@ This file contains output generation utilities for gaussian splatting and overal
 TODO: Maybe remove kwargs stuff. More confusing than not
 """
 
+import render
+from utils.nerf_utils import convert_ply_to_splat
 
 import logging
-from typing import List
-import render
-
 from pathlib import Path
-from utils.nerf_utils import convert_ply_to_splat
 
 
 def generate_output_ply(output_dict: dict, base_url: str, output_path: Path, save_iterations: list):
@@ -69,7 +67,7 @@ def generate_output_splat(output_dict: dict, base_url: str, output_path: Path, s
     # Write splat files
     for iteration in save_iterations:
         ply_file_path = output_path / f"point_cloud/iteration_{iteration}/{id}.ply"
-        splat_bytes = convert_ply_to_splat(ply_file_path, 1_000_000, False)
+        splat_bytes = convert_ply_to_splat(ply_file_path, 10_000_000)
         splat_file_path = ply_file_path.parent / f"{id}.splat"
         open(splat_file_path, "wb").write(splat_bytes)
     
@@ -130,7 +128,7 @@ def populate_outputs(output_dict: dict, types: list, base_url: str, output_path:
     created by gaussian splatting. Populates output_dict to contain
     appropriate GET endpoints to retrieve outputs
 
-    TODO: Remove hardcoded base_url. Here bc some funky stuff with Path normalizing "//" in url even though it shouldnt
+    TODO: DONE 8/10/24 Remove hardcoded base_url. Here bc some funky stuff with Path normalizing "//" in url even though it shouldnt
 
     Args:
         output_dict (dict): data needed by web-server to handle completed nerf job.

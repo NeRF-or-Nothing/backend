@@ -1,48 +1,66 @@
 """
 This module contains the ClientService class, which is responsible for handling all incoming client requests to the web-server.
 
-TODO: Why call this ClientService but file scene_service.py?
+TODO: DONE 8/7/24 Why call this ClientService but file scene_service.py?
 TODO: Test all Scene.py, scene_Service.py, controller.py 
 TODO: Unify Error Handling across all services and workers
 """
 
 
-import base64
-import gzip
-import json
 import os
-import io
 import logging
 
 from models.scene import Video, TrainingConfig
 from models.managers import SceneManager, UserManager
-from models.status import NerfError, NerfStatus
+from models.status import NerfError, NerfStatus, UserError, UserStatus
 from services.queue_service import RabbitMQService, RabbitMQServiceV2
 from utils.response_utils import create_response
 
+from functools import wraps
 from typing_extensions import deprecated
 from typing import Optional, Tuple
-from uuid import uuid4, UUID
+from uuid import uuid4
 from werkzeug.utils import secure_filename
-from flask import jsonify, Response, send_file, make_response
+from flask import Response, send_file
 
 
 class ClientService:
-    def __init__(self, scene_manager: SceneManager, rmqservice: RabbitMQServiceV2):
+    def __init__(self, scene_manager: SceneManager, rmqservice: RabbitMQServiceV2, user_manager: UserManager):
         self.logger = logging.getLogger('web-server')
         self.scene_manager = scene_manager
         self.rmqservice = rmqservice
+        self.user_manager = user_manager
 
+    def verify_user_access(f):
+        """
+        Decorator to verify user access to a specific job/resource.
+        Will insert argument job_id at the beginning of the function call.
+        """
+        @wraps(f)
+        def decorated(self, user_id: str, job_id: str, *args, **kwargs):
+            if not self.user_manager.user_has_job_access(user_id, job_id):
+                return create_response(
+                    status=NerfStatus.ERROR,
+                    error=UserError.UNAUTHORIZED,
+                    message="User does not have access to this resource",
+                    status_code=403
+                )
+            return f(self, job_id, *args, **kwargs)
+        return decorated
+
+    @verify_user_access
     def get_nerf_metadata(self, uuid: str) -> Response:
         """
-        Retrieve all metadata for the given UUID.
+        Retrieve all metadata for the given uuid (job id).
         Return formatted JSON response. Sends file
         size, chunk size, and number of chunks for each
-        resource type.
+        resource type. Will respond 404 until job is finished.
+        
+        TODO Change this to return training progress if not finished, and nerf metadata if finished \
+            (or just direct frotend to use /queue endpoints until job is finished)
         
         Args:
             uuid (str): The UUID of the NeRF job.
-        
         Returns:
             Response: A Flask response containing the metadata.
         """
@@ -110,7 +128,8 @@ class ClientService:
                 status_code=500
             )
 
-    def get_nerf_type_metadata(self, output_type: str, uuid: str) -> Response:
+    @verify_user_access
+    def get_nerf_type_metadata(self, uuid: str, output_type: str) -> Response:
         """
         Retrieve metadata for the specific output type and UUID.
         Return formatted JSON response.
@@ -180,20 +199,19 @@ class ClientService:
                 status_code=500
             )
 
-    def handle_incoming_video(self, video_file, request_params: dict) -> Optional[str]:
+    def handle_incoming_video(self, user_id, video_file, request_params: dict, scene_name: Optional[str]) -> Optional[str]:
         """
         Validates POSTed videos, finishes job creation, and posts it to worker
-        pipeline
+        pipeline. Assumes valid user_id given.
 
         TODO: Add .wav file support, we claim to support .mp4 and .wav files
 
         Args:
+            user_id (str): User ID
             video_file (_type_): video file
-            training_mode (str)): job nerf training mode
-            output_types (List[str]]):  job output types
-            **args (dict): additional job parameters from 
+            request_params (dict): additional job parameters from 
             incoming POST request
-
+            scene_name (str): Optional scene name
         Returns:
             str: UUID of new job
         """
@@ -210,7 +228,6 @@ class ClientService:
             self.logger.error("ERROR: improper file extension uploaded")
             return None
 
-        # generate new id and save to file with db record
         uuid = str(uuid4())
         self.logger.info("New UUID : %s", uuid)
 
@@ -222,26 +239,30 @@ class ClientService:
         video_file_path = os.path.join(video_file_path, video_name)
         video_file.save(video_file_path)
 
-        # Save video to database
+        # Save video to database and create config
         video = Video(video_file_path)
-        self.scene_manager.set_video(uuid, video)
-
-        # Save config to scenes collection. Used by workers for dynamic configs
-        self.logger.debug("request_params: %s", request_params)
         training_config = TrainingConfig().get_default()
         training_config.update({"nerf_config": request_params})
+        
+        self.scene_manager.set_video(uuid, video)
+        self.scene_manager.set_scene_name(uuid, scene_name)
         self.scene_manager.set_training_config(uuid, training_config)
-        self.logger.info("Wrote config to mongodb. Config %s.\nJob %s", training_config.nerf_config, id)
-
-        # create rabbitmq job for sfm
         self.rmqservice.publish_sfm_job(uuid, video, training_config)
+        
+        user = self.user_manager.get_user_by_id(user_id)
+        user.add_scene(uuid)
+        self.user_manager.update_user(user)
+        
         return uuid
 
+    @verify_user_access
     def send_nerf_resource(self, uuid: str, resource_type: str, iteration: str, range_header: Optional[str]) -> Response:
         """
         Handles actual file retrieval and file sending for incoming 
         GET requests to WebServer routes for finished nerf training
-        resources.
+        resources. You SHOULD request a range header to get the file,
+        as max http is 30MB, and if not provided, sends the first
+        30MB or less of the file.
 
         Args:
             id (str): Job UUID
@@ -307,7 +328,6 @@ class ClientService:
         Args:
             range_header (str): The Range header from the HTTP request.
             file_size (int): The total size of the file.
-        
         Returns:
             Tuple[int, int]: The start and end byte positions.
         """
@@ -326,73 +346,78 @@ class ClientService:
             raise ValueError("Invalid range: start > end")
         return start, end
     
-    @deprecated("Legacy Code. Used for retriving old tensorf rendered videos")
-    def get_nerf_video_path(self, uuid):
+    def get_user_history(self, user_id: str) -> Response:
         """
-        LEGACY. Finds file path to rendered video 
+        List all finished training resource uuids for a specific user. 
+        Verification occurs in webserver.
 
         Args:
-            uuid (_type_): job id
-
+            user_id (str): The ID of the user.
         Returns:
-            _type_: file path 
+            A response containing the list of resource UUIDs.
         """
-        # TODO: depend on mongodb to load file path
-        # return None if not found
-        nerf = self.scene_manager.get_nerf(uuid)
-        if nerf:
-            return nerf.rendered_video_path
-            # return ("Video ready", nerf.rendered_video_path)
-        return None
-
-    def list_resources_by_job_id(self, job_id: str) -> dict:
+        all_resources = []
+        
+        user = self.user_manager.get_user_by_id(user_id) 
+        
+        if user == UserError.USER_NOT_FOUND:
+            return create_response(
+                status=UserStatus.ERROR,
+                error=UserError.USER_NOT_FOUND,
+                message="User not found",
+                status_code=404
+            )
+        
+        for scene_id in user.scene_ids:
+            nerf = self.scene_manager.get_nerfV2(scene_id)
+            if nerf:
+                all_resources.append(scene_id)
+        
+        return create_response(
+            status=UserStatus.SUCCESS,
+            error=UserError.NO_ERROR,
+            message="User found, resources retrieved",
+            data={"resources": all_resources},
+            status_code=200
+        )
+        
+    @verify_user_access
+    def get_preview(self, uuid: str):
         """
-        Lists all finished training resources for a specific job.
-
+        Returns the preview image and scene name for the given job UUID.
+        
         Args:
-            job_id (str): The ID of the job.
-
+            uuid (str): The job UUID.
         Returns:
-            dict: A dictionary containing the job's finished resources.
+            Response: response containing the preview image and scene name.
         """
-        raise NotImplementedError("Needs User, UserManager, and Job classes to be implemented more completely and implemented.")
-        nerf = self.scene_manager.get_nerfV2(job_id)
-        if nerf and nerf.flag == 0:  # Assuming flag 0 means processing is complete
-            resources = {
-                "splat_cloud": list(nerf.splat_cloud_file_paths.keys()) if nerf.splat_cloud_file_paths else [],
-                "point_cloud": list(nerf.point_cloud_file_paths.keys()) if nerf.point_cloud_file_paths else [],
-                "video": list(nerf.video_file_paths.keys()) if nerf.video_file_paths else [],
-                "model": list(nerf.model_file_paths.keys()) if nerf.model_file_paths else []
-            }
-            return {job_id: resources}
-        return {}
-    
-    
-    def list_resources_by_user_id(self, user_id: str) -> dict:
-        """
-        NOT IMPLEMENTED. Would list all finished training resources for a specific user. 
-
-        Args:
-            user_id (str): The ID or API key of the user.
-
-        Returns:
-            dict: A dictionary containing all of the user's jobs and their finished resources.
-        """
-        raise NotImplementedError("Needs User, UserManager, and Job classes to be implemented more completely and implemented.")
-        all_resources = {}
         
-        # Assuming you have a method to get all job IDs for a user
-        user = self.user_maneager.get_user(user_id) 
-        job_ids = user.get_job_ids() # Prob use scenes list from user
+        sfm = self.scene_manager.get_sfm(uuid)
+        if sfm:
+            sfm_folder = f"data/sfm/{uuid}"
+            png_files = [f for f in os.listdir(sfm_folder) if f.endswith(".png")]
+            if png_files:
+                scene_name = self.scene_manager.get_scene_name(uuid)
+                file_path = os.path.join(sfm_folder, png_files[0])
+                
+                response =  send_file(
+                    os.path.abspath(file_path),
+                    mimetype='image/png',
+                    as_attachment=True,
+                    download_name=png_files[0],
+                )
+                response.headers['X-Scene-Name'] = scene_name
+                response.headers['Access-Control-Expose-Headers'] = 'X-Scene-Name'
+                return response
+            
+        return create_response(
+            status=NerfStatus.ERROR,
+            error=NerfError.FILE_NOT_FOUND,
+            message="No preview image found",
+            uuid=uuid,
+            status_code = 404
+        )
         
-        for job_id in job_ids:
-            job_resources = self.get_resources_by_job_id(job_id)
-            if job_resources:
-                all_resources.update(job_resources)
-        
-        return all_resources
-
-
     def get_nerf_resource_path(self, uuid: str, type: str, iteration: str):
         """
         Retrieves the file path on web-server for valid training output
@@ -415,43 +440,28 @@ class ClientService:
             self.logger.info("No nerf/nerf_config object found for job %s", uuid)
             return None
         nerf = nerf.to_dict()
-        self.logger.info("nerf: %s", nerf)
+        self.logger.debug("nerf: %s", nerf)
 
         # Find path for given iteration, or latest available
         if iteration == "" or iteration is None:
-            # No iteration given, send farthest trained resource
             self.logger.info("No iteration given, sending latest")
             valid_iterations = nerf[f"{type}_file_paths"]
             max_iteration = max(valid_iterations.keys(), key=lambda x: int(x))
             path = valid_iterations[max_iteration]
             return path
         if int(iteration) in nerf_config["save_iterations"]:
-            # Valid Request parameter, attempt to find corresponding resource
             self.logger.info("Valid iteration given, sending resource")
             path = nerf[f"{type}_file_paths"][iteration]
             return path
         else:
-            # Invalid Request parameter, return None
             return None
 
-    @deprecated("Legacy Code. Used for retriving old tensorf rendered videos error flag")
-    def get_nerf_flag(self, uuid):
-        """
-        Returns an integer describing the status of the video in the database.
-        encode information on the COLMAP error that went wrong(e.g. 4 is a blurry video)
-        """
-        nerf = self.scene_manager.get_nerf(uuid)
-        if nerf:
-            return nerf.flag
-        return 0
-    
     def get_nerf_flagV2(self, uuid: str) -> int:
         """
         Returns the error flag for the given job UUID.
 
         Args:
             uuid (str): The job UUID.
-
         Returns:
             int: The error flag for the job.
         """
@@ -466,8 +476,37 @@ class ClientService:
 
         Args:
             flag (int): The error flag to decode.
-
         Returns:
             NerfError: The corresponding NerfError enum.
         """
         return next((error for error in NerfError if error.code == flag), NerfError.UNKNOWN)
+
+    @deprecated("Legacy Code. Used for retriving old tensorf rendered videos")
+    def get_nerf_video_path(self, uuid):
+        """
+        LEGACY. Finds file path to rendered video 
+
+        Args:
+            uuid (_type_): job id
+        Returns:
+            _type_: file path 
+        """
+        # TODO: depend on mongodb to load file path
+        # return None if not found
+        nerf = self.scene_manager.get_nerf(uuid)
+        if nerf:
+            return nerf.rendered_video_path
+            # return ("Video ready", nerf.rendered_video_path)
+        return None
+
+    @deprecated("Legacy Code. Used for retriving old tensorf rendered videos error flag")
+    def get_nerf_flag(self, uuid):
+        """
+        Returns an integer describing the status of the video in the database.
+        encode information on the COLMAP error that went wrong(e.g. 4 is a blurry video)
+        """
+        nerf = self.scene_manager.get_nerf(uuid)
+        if nerf:
+            return nerf.flag
+        return 0
+    

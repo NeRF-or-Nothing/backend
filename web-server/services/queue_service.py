@@ -43,7 +43,7 @@ class RabbitMQServiceV2:
         self.rabbitmq_domain = rabbitip
         self.queue_manager = manager
         self.scene_manager = scene_manager
-        self.base_url = "http://host.docker.internal:5000/"
+        self.base_url = "https://host.docker.internal:5000/"
         self.credentials = pika.PlainCredentials(str(os.getenv("RABBITMQ_DEFAULT_USER")), str(os.getenv("RABBITMQ_DEFAULT_PASS")))
         self.parameters = pika.ConnectionParameters(self.rabbitmq_domain, 5672, '/', self.credentials, heartbeat=300)
         # Publish function connections
@@ -79,7 +79,7 @@ class RabbitMQServiceV2:
         """
         Converts a file path to a URL for the worker to download the file from the web server.
         """
-        return self.base_url + "/worker-data/" + file_path
+        return self.base_url + "worker-data/" + file_path
 
     def publish_sfm_job(self, id: str, vid: Video, config: TrainingConfig):
         """
@@ -134,6 +134,8 @@ class RabbitMQServiceV2:
         combined_job = {**job, **sfm_data, **config.nerf_config}
         json_job = json.dumps(combined_job)
 
+        print("NERF JOB: ", json_job, flush=True)
+
         # Publish job to nerf-in queue and append to nerf_list queue manager
         self.channel.basic_publish(exchange='', routing_key='nerf-in', body=json_job)
         self.queue_manager.append_queue("nerf_list", id)
@@ -156,6 +158,7 @@ class RabbitMQServiceV2:
         Stores the video and sfm data in the database and publishes a new job to the nerf-in queue.
         
         TODO: Modify this and Colmap Worker code to better resemble nerf worker code
+        TODO: Actually use the k_mean_sampling function (maybe for only > 100 frames provided, but that is hardcoded on sfm-worker)
         """
         
         def process_sfm_job(ch, method, properties, body):
@@ -189,8 +192,6 @@ class RabbitMQServiceV2:
                     os.makedirs(file_path, exist_ok=True) 
                     file_path += "/" + filename
                     open(file_path,"wb").write(img.content)
-
-                    path = os.path.join(os.getcwd(), file_path)
                     sfm_data['frames'][i]["file_path"] = file_path
             
             # Get indexes of k mean grouped frames
@@ -211,7 +212,6 @@ class RabbitMQServiceV2:
             self.queue_manager.pop_queue("sfm_list",id)
 
             self.logger.info("Saved finished SFM job")
-            new_data = json.dumps(sfm_data)
             
             # Publish new job to nerf-in only if good status (flag of 0)
             if(flag == 0):

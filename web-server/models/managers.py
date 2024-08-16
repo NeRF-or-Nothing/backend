@@ -10,10 +10,12 @@ from models.scene import NerfV2, Nerf, Video, Sfm, TrainingConfig, QueueList
 from models.scene import Scene, scene_from_dict, scene_to_dict 
 from models.scene import User, user_from_dict, user_to_dict
 from models.scene import worker_from_dict, worker_to_dict
-from typing import Optional
+from models.status import UserStatus, UserError
+from typing import Optional, Tuple
 from typing_extensions import deprecated
 from uuid import uuid4
 from pymongo import MongoClient
+from cryptography.fernet import Fernet
 
 
 class QueueListManager:
@@ -155,6 +157,8 @@ class SceneManager:
     Manages storage and retrieval of scenes in the database
     
     TODO: Need to decide if should continue to return None, Raise Exception, or return a default object
+    TODO: define set update get and delete for each object adds scene to the collection replacing any existing scene with the same id
+    TODO: DONE 7/11/24 add worker configs per job, so that dynamic training/output modes can be supports
     """
     def __init__(self) -> None:
         client = MongoClient(host=str(os.getenv("MONGO_IP")),port=27017,username=str(os.getenv("MONGO_INITDB_ROOT_USERNAME")),\
@@ -163,8 +167,7 @@ class SceneManager:
         self.collection = self.db["scenes"]
         self.upsert=True
     
-    # TODO: define set update get and delete for each object adds scene to the collection replacing any existing scene with the same id
-    # TODO: DONE 7/11/24 add worker configs per job, so that dynamic training/output modes can be supports
+    
     def set_training_config(self, _id: str, config: TrainingConfig):
         """
         Sets the training configuration for a scene.
@@ -203,7 +206,7 @@ class SceneManager:
         value = {"$set": fields}
         self.collection.update_one(key, value, upsert=self.upsert)
 
-    def set_sfm(self, _id: str, sfn: Sfm):
+    def set_sfm(self, _id: str, sfm: Sfm):
         """
         Sets the sfm object for a scene.
         
@@ -212,7 +215,7 @@ class SceneManager:
             sfn (Sfm): sfm object
         """
         key = {"_id":_id}
-        fields = {"sfm."+k:v for k,v in sfn.to_dict().items()}
+        fields = {"sfm."+k:v for k,v in sfm.to_dict().items()}
         value = {"$set": fields}
         self.collection.update_one(key, value, upsert=self.upsert)
 
@@ -229,6 +232,17 @@ class SceneManager:
         value = {"$set": fields}
         self.collection.update_one(key, value, upsert=self.upsert)
 
+    def set_scene_name(self, _id: str, name: str):
+        """
+        Sets the name of a scene.
+
+        Args:
+            _id (str): scene id
+        """
+        key = {"_id":_id}
+        value = {"$set": {"name":name or ""}}
+        self.collection.update_one(key, value, upsert=self.upsert)        
+    
     @deprecated("Legcay Code. Use set_nerfV2 instead")
     def set_nerf(self, _id: str, nerf: Nerf):
         """
@@ -242,6 +256,22 @@ class SceneManager:
         fields = {"nerf."+k:v for k,v in nerf.to_dict().items()}
         value = {"$set": fields}
         self.collection.update_one(key, value, upsert=self.upsert)
+
+    def get_scene_name(self, _id: str) -> Optional[str]:
+        """
+        Gets the name of a scene.
+
+        Args:
+            _id (str): scene id
+        Returns:
+            Optional[str]: name of the scene
+        """
+        key = {"_id":_id}
+        doc = self.collection.find_one(key)
+        if doc:
+            return doc.get("name")
+        else:
+            return None
 
     def get_training_config(self, _id: str) -> Optional[TrainingConfig]:
         """
@@ -344,8 +374,13 @@ class SceneManager:
 class UserManager:
     """
     Manages storage and retrieval of users in the database. 
+    user ID & Username must be unique. Uses encryption key for API key encryption.
+    Will generate new encryption key if none is provided.
+    
+    TODO: Probably switch over to UserStatus, UserError
     """
-    def __init__(self,unittest=False) -> None:
+    
+    def __init__(self, unittest=False) -> None:
         # unittest=True implies this runs on localhost for unit testing
         mongoip = "localhost" if unittest else str(os.getenv("MONGO_IP"))
         client = MongoClient(host=mongoip,port=27017,username=str(os.getenv("MONGO_INITDB_ROOT_USERNAME")),\
@@ -354,82 +389,111 @@ class UserManager:
         self.collection = self.db["users"]
         self.upsert=True
 
-    # TODO: This should be cleaned up.
-    def set_user(self, user: User):
+    def set_user(self, user: User) -> Tuple[UserStatus, UserError]:
         """
-        Sets a user in the database
+        Sets a user in the database. If the user already exists returns an error.
+        Assumes User object contains valid already encrypted pw/apikey
+        
+        TODO: DONE 7/15/24 This should be cleaned up.
+        TODO: Really should allow user infomration to be updated
         
         Args:
             user (User): user object
-        Raises:
-            Exception: If two users are assigned the same ID
         Returns:
-            status code (0: success, 1: username already exists)
+            UserStatus, UserError
         """
-        #usernames and ids are forced to be unique, passwords are not
         key={"username":user.username}
         doc = self.collection.find_one(key)
         if doc!=None:
-            #Two users assigned with same username
-            return 1
+            return UserStatus.ERROR, UserError.USERNAME_ALREADY_EXISTS
+        
         key={"_id":user._id}
         doc = self.collection.find_one(key)
         if doc!=None:
-            raise Exception('Two users assigned with same ID!')
-        user.password=str(hash(user.password))
+            return UserStatus.ERROR, UserError.ID_ALREADY_EXISTS
 
         value = {"$set": user.to_dict()}
         self.collection.update_one(key,value,upsert=self.upsert)
-        return 0
+        return UserStatus.SUCCESS, UserError.NO_ERROR
 
-    # TODO: Remove str based password. 
-    def generate_user(self, username:str, password:str):
+    def update_user(self, user: User) -> Tuple[UserStatus, UserError]:
+        """
+        Updates a user in the database.
+
+        Args:
+            user (User): user object to update
+        Returns:
+            Tuple[UserStatus, UserError]: Status of the operation
+        """
+        key = {"_id": user._id}
+        value = {"$set": user.to_dict()}
+        result = self.collection.update_one(key, value, upsert=self.upsert)
+        
+        if result.modified_count > 0 or result.upserted_id:
+            return UserStatus.SUCCESS, UserError.NO_ERROR
+        else:
+            return UserStatus.ERROR, UserError.USER_NOT_FOUND
+        
+    def generate_user(self, username:str, password:str) -> Tuple[UserStatus, UserError]:
         """
         Generates a new user object and sets it in the database.
+        
         Args:
             username (str): Username
             password (str): Password
         Returns:
-            [0 | 1 | User]: User object if successful, error code if not
+            Tuple[UserStatus, UserError]: Status of the operation
         """
         _id = str(uuid4())
-        user=User(username,password,_id)
-        errorcode=self.set_user(user)
-        if(errorcode!=0):
-            return errorcode
-            
-        return user
-            
-    def get_user_by_id(self, _id: str) -> Optional[User]:
+        
+        # Check if generated user id already exists
+        while self.get_user_by_id(_id) != UserError.USER_NOT_FOUND:
+            _id = str(uuid4())
+        
+        user = User(username, _id)
+        user.set_password(password)
+        return self.set_user(user)
+        
+    def get_user_by_id(self, _id: str) -> User | UserError:
         """
         Gets a user by ID.
 
         Args:
             _id (str): user id
         Returns:
-            Optional[User]: user object if found, None if not
+            User | UserError : User object if found, Error if not
         """
         key = {"_id":_id}
         doc = self.collection.find_one(key)
         if doc:
             return User.from_dict(doc)
         else:
-            return None
+            return UserError.USER_NOT_FOUND
 
-    #TODO: Write an overloaded function for finding users by username
-    def get_user_by_username(self, username: str) -> Optional[User]:
+    def get_user_by_username(self, username: str) -> User | UserError:
         """
         Gets a user by username.
 
         Args:
             username (str): username
         Returns:
-            Optional[User]: user object if found, None if not
+            User | UserError : User object if found, Error if not
         """
         key = {"username":username}
         doc = self.collection.find_one(key)
         if doc:
             return User.from_dict(doc)
         else:
-            return None
-         
+            return UserError.USER_NOT_FOUND
+
+    def user_has_job_access(self, user_id: str, job_id: str) -> bool:
+        """
+        Validates that the user has access to the job.
+
+        Args:
+            user_id (str): user id
+            job_id (str): job id
+        Returns:
+            bool: True if user has access, False if not
+        """
+        return job_id in self.get_user_by_id(user_id).scene_ids

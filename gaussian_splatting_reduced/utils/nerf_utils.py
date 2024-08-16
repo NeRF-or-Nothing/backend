@@ -18,7 +18,7 @@ from pathlib import Path
 
 def convert_transforms_to_gaussian(transforms):
     '''
-    Utility function to convert the transforms file from the format TensoRF uses to
+    Utility function to convert the transforms file from the format TensoRF input / SFM output uses to
     the format used by the gaussian splatting code. See online resources for more 
     camera/world space transformation details.
 
@@ -48,13 +48,13 @@ def convert_transforms_to_gaussian(transforms):
         ]
     }
     '''
-    logger = logging.getLogger("nerf-worker-gaussian")
+    logger = logging.getLogger("nerf-worker-dispatcher")
     logger.info("Converting transforms format for {transforms[\"%s\"]}", id)
 
     intrinsic = np.array(transforms["intrinsic_matrix"])
     width = transforms["vid_width"]
     height = transforms["vid_height"]
-    fovx = 2 * np.tanh(width / (2 * intrinsic[0,    0]))
+    fovx = 2 * np.tanh(width / (2 * intrinsic[0, 0]))
     fovy = 2 * np.tanh(height / (2 * intrinsic[1, 1]))
     transforms["camera_angle_x"] = fovx
     transforms["camera_angle_y"] = fovy
@@ -79,11 +79,13 @@ def convert_ply_to_splat(ply_file_path: Path, num_splats: int = sys.maxsize, ver
     frontend renderer. 1M splats is roughly 50MB compressed.
 
     Args:
-        ply_file_path (_type_): Path to the .ply file to convert
-        num_splats (_type_): Number of splats to convert. Defaults to maxsize.
+        ply_file_path (Path): Path to the .ply file to convert
+        num_splats (int): Number of splats to convert. Defaults to maxsize.
         verbose (bool, optional): Defaults to False.
+    Returns:
+        bytes: The converted splats in a byte buffer
     """
-    logger = logging.getLogger("nerf-worker-gaussian")
+    logger = logging.getLogger("nerf-worker-dispatcher")
 
     plydata = PlyData.read(ply_file_path)
     vert = plydata["vertex"]
@@ -129,8 +131,8 @@ def convert_ply_to_splat(ply_file_path: Path, num_splats: int = sys.maxsize, ver
             logger.info("Converted %d splats", num_converted)
 
         num_converted += 1
-        if num_splats != 0 and num_converted == num_splats:
-            break
+        # if num_splats != 0 and num_converted == num_splats:
+        #     break
 
     logger.info("Converted %d splats", num_converted)
     return buffer.getvalue()

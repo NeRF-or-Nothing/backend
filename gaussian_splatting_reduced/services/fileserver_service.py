@@ -1,16 +1,19 @@
 """
 This file contains the FileServer class which is responsible for handling all GET requests to the nerf-worker server.
+
+TODO: Setup CORS, so only webserver can use these endpoints
 """
 
 
 import logging
 
-import os
+from log import nerf_worker_logger
+
 from typing import Optional
 from pathlib import Path
 from flask import Flask, send_from_directory, jsonify, Response, request, make_response
-from log import nerf_worker_logger
 
+cert_path = '/app/secrets/cert.pem' # Local Self-Signed Cert Path
 
 class FileServer:
     """
@@ -19,6 +22,7 @@ class FileServer:
 
     def __init__(self, base_url: str = "http://nerf-worker-gaussian:5200/"):
         self.app = Flask(__name__)
+        self.app.url_map.strict_slashes = False
         self.base_url = base_url
         self.logger = nerf_worker_logger("nerf-worker-server")
         self.setup_routes()
@@ -28,14 +32,18 @@ class FileServer:
         """
         Creates flask routes for GET endpoints
         """
-        self.app.route("/data/nerf/video/<uuid>",
-                       methods=["GET"])(self.send_video)
-        self.app.route("/data/nerf/point_cloud/<uuid>",
-                       methods=["GET"])(self.send_point_cloud)
-        self.app.route("/data/nerf/splat_cloud/<uuid>",
-                       methods=["GET"])(self.send_splat_cloud)
-        self.app.route("/data/nerf/<file_type>/<uuid>",
-                       methods=["GET"])(self.send_output)
+        self.app.route("/data/nerf/video/<uuid>", methods=["GET"])(
+            self.send_video)
+        
+        self.app.route("/data/nerf/point_cloud/<uuid>", methods=["GET"])(
+            self.send_point_cloud)
+        
+        self.app.route("/data/nerf/splat_cloud/<uuid>", methods=["GET"])(
+            self.send_splat_cloud)
+        
+        self.app.route("/data/nerf/<file_type>/<uuid>", methods=["GET"])(
+            self.send_output)
+        
         self.logger.info("Routes set up")
 
     def get_latest_iteration(self, uuid: str, file_type: str, file_extension: str) -> Optional[Path]:
@@ -44,7 +52,7 @@ class FileServer:
 
         TODO: DONE 7/10/24 Change from point_cloud to both ply and splat, as there might 
         be only a iteration_X/point_cloud/uuid.ply but not a same/path/uuid.splat
-        
+
         Args:
             uuid (_type_): job ID
             file_type (_type_): Overarching information representation
@@ -108,7 +116,8 @@ class FileServer:
             file_path = Path("data/nerf") / uuid / file_type / \
                 f"iteration_{iteration}" / f"{uuid}.{file_extension}"
         else:
-            latest_iter = self.get_latest_iteration(uuid, file_type, file_extension)
+            latest_iter = self.get_latest_iteration(
+                uuid, file_type, file_extension)
             if not latest_iter:
                 self.logger.error("No latest iteration resource found for UUID: %s, file type: %s, extension: %s",
                                   uuid, file_type, file_extension)
@@ -118,7 +127,7 @@ class FileServer:
 
             file_path = latest_iter / f"{uuid}.{file_extension}"
         file_path = file_path.absolute()
-        
+
         if not file_path.exists():
             self.logger.error("File not found: %s", file_path)
             return make_response(jsonify({

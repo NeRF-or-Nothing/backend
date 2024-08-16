@@ -8,7 +8,7 @@ def nerf_worker_logger(name='root'):
     To retrieve in different context: 'logger = logging.getLogger(name)'
     """
 
-    formatter = logging.Formatter(fmt='%(asctime)s - %(levelname)s - %(module)s - %(message)s')
+    formatter = logging.Formatter(fmt='[%(asctime)s] %(levelname)s - %(module)s - %(funcName)s - %(message)s')
     handler = logging.FileHandler(name+'.log', mode='w')
     handler.setFormatter(formatter)
     

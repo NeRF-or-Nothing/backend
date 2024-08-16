@@ -1,10 +1,9 @@
-version: '3.7'
 services:
   mongodb:
     image: mongo:latest
     container_name: mongodb
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME} 
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
     ports:
       - 27017:27017
@@ -12,86 +11,89 @@ services:
       - mongodb_data_container:/data/db
     networks:
       - backend
-  
+
   rabbitmq:
     container_name: rabbitmq
     image: rabbitmq:3.8-management-alpine
     environment:
-       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
-       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
     ports:
-       # AMQP protocol port
-       - '5672:5672'
-       # HTTP management UI
-       - '15672:15672'
+      # AMQP protocol port
+      - "5672:5672"
+      # HTTP management UI
+      - "15672:15672"
     networks:
       - backend
-    
+
   web-server:
-    build: 
-      context: .
-      dockerfile: ./web-server/Dockerfile
+    build:
+      context: ./web-server
+      dockerfile: ./docker/Dockerfile
     image: web-server-img
     container_name: web-server
     depends_on:
-    - rabbitmq
-    - mongodb
+      - rabbitmq
+      - mongodb
     environment:
       APP_PORT: 5000
     volumes:
-      # Host directory : Container directory
-      - ./web-server:/web-server
+      - ./web-server:/app
+      - ssl-certs:/app/secrets
     ports:
       - "5000:5000"
     networks:
       - backend
-    command: python3 main.py --configip configs/docker_in.json
+    # TODO: Use real SSL certificates instead of self-signed ones OR BETTER move to reverse proxy with real SSL certificates
+    command: > # Generate self-signed SSL certificates and start the web server
+      sh -c "
+      openssl req -x509 -newkey rsa:4096 -keyout /app/secrets/key.pem -out /app/secrets/cert.pem -days 365 -nodes -subj '/CN=web-server' &&
+      cp /app/secrets/cert.pem /app/secrets/public-cert.pem &&
+      python3 main.py --configip configs/docker_in.json
+      "
 
   sfm-worker:
-      build: 
-        context: .
-        dockerfile: ./colmap/Dockerfile
-
-      image: sfm-worker-img
-      container_name: sfm-worker
-      depends_on:
-        - rabbitmq
-        - web-server
-      volumes: 
-        - ./colmap:/colmap
-
-      ports: 
-        - 5100:5100
-      networks:
-        - backend 
-      command: python3.10 main.py --config=configs/default.txt
+    build:
+      context: ./colmap
+      dockerfile: Dockerfile
+    image: sfm-worker-img
+    container_name: sfm-worker
+    depends_on:
+      - rabbitmq
+      - web-server
+    volumes:
+      - ./colmap:/app
+      - ssl-certs:/app/secrets:ro # Readonly access to SSL certificates
+    ports:
+      - 5100:5100
+    networks:
+      - backend
+    command: python3.10 main.py --config=configs/default.txt
 
   nerf-worker-gaussian:
-      build:
-        context: ./gaussian_splatting_reduced
-        dockerfile: Dockerfile
-      
-      image: nerf-worker-gaussian-img
-      container_name: nerf-worker-gaussian
-      depends_on:
-        - rabbitmq
-        - web-server
-      volumes:
-        - ./gaussian_splatting_reduced:/gaussian_splatting_reduced
-      
-      ports: 
-        - 5200:5200
-      networks:
-        - backend
-      command: ./entry_point.sh
-
-      deploy:
-        resources:
-          reservations:
-            devices:
-              - driver: nvidia
-                count: all
-                capabilities: [gpu]
+    build:
+      context: ./gaussian_splatting_reduced
+      dockerfile: Dockerfile
+    image: nerf-worker-gaussian-img
+    container_name: nerf-worker-gaussian
+    depends_on:
+      - rabbitmq
+      - web-server
+    volumes:
+      - ./gaussian_splatting_reduced:/app
+      - ssl-certs:/app/secrets:ro # Readonly access to SSL certificates
+    ports:
+      - 5200:5200
+    networks:
+      - backend
+    command: ./build_dependencies_and_start.sh # Needed to build Pytorch CudaExtension dependencies
+    deploy: # Use NVIDIA GPUs
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
 
 networks:
   backend:
@@ -100,4 +102,4 @@ networks:
 
 volumes:
   mongodb_data_container:
-
+  ssl-certs:

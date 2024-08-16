@@ -3,22 +3,23 @@ This file loads the environment variables from the .env file.
 Afterwards, the Web Server is started.
 """
 
-from argparser import create_arguments
-from controller import WebServer
 import threading
-from models.managers import SceneManager, QueueListManager
-from services.queue_service import RabbitMQService, digest_finished_sfms, digest_finished_nerfs, RabbitMQServiceV2
-from services.scene_service import ClientService
-from services.clean_service import cleanup
-from pymongo import MongoClient
 import json
 import os
+import logging
+
+from models.managers import SceneManager, QueueListManager, UserManager
+from services.queue_service import RabbitMQService, digest_finished_sfms, digest_finished_nerfs, RabbitMQServiceV2
+from services.client_service import ClientService
+from services.controller import WebServer
+from log.log import web_server_logger
+from utils.argparser import create_arguments
+
+from pymongo import MongoClient
 from dotenv import load_dotenv
 
-import logging
-from log import web_server_logger
 
-# TODO: Add sphinx documentation generation. Probably use git actions to auto generate docs on push to master
+# TODO: Add sphinx documentation generation. Probably use git actions to auto generate docs on push/pr to master
 def main():
     """
      STARTING LOGGER
@@ -37,7 +38,7 @@ def main():
     ipdata = json.load(ipfile)
     
     # Load environmental 
-    load_dotenv()
+    load_dotenv("secrets/.env")
              
     rabbitip = str(os.getenv("RABBITMQ_IP"))
     flaskip = ipdata["flaskdomain"]
@@ -52,13 +53,16 @@ def main():
     # Rabbitmq service to post/consume jobs to/from the workers <from services>
     rmq_service = RabbitMQServiceV2(rabbitip, queue_man, scene_man)
 
+    # User manager to manage user data
+    user_man = UserManager()
+
     # TODO: async worker to clean up old data
     
     # service to handle all incoming client requests from the controller <from services>
-    c_service = ClientService(scene_man, rmq_service)
+    c_service = ClientService(scene_man, rmq_service, user_man)
 
     # start listening to incoming requests on the controller <from controllers>
-    server = WebServer(flaskip, args, c_service, queue_man)
+    server = WebServer(flaskip, os.getenv("JWT_SECRET_KEY"), args, c_service, queue_man)
 
     ipfile.close() 
     server.run()

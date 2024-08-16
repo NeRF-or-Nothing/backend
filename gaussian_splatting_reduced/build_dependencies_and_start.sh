@@ -5,7 +5,7 @@
 # and then runs the main.py Python script you would normally find in 
 # the other service containers like sfm-worker.
 
-echo "Starting entry_point.sh"
+echo "Starting build_dependencies_and_start.sh"
 
 # Function to check if a package is installed
 is_package_installed() {

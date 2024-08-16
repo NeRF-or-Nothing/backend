@@ -7,7 +7,7 @@ def web_server_logger(name='root'):
         To initialize use: 'logger = log.web_server_logger(name)'
         To retrieve in different context: 'logger = logging.getLogger(name)'
     """
-    formatter = logging.Formatter(fmt='%(asctime)s - %(levelname)s - %(module)s - %(message)s')
+    formatter = logging.Formatter(fmt='[%(asctime)s] %(levelname)-8s - %(module)-12s - %(funcName)-12s - %(message)s')
     handler = logging.FileHandler(name+'.log', mode='w')
     handler.setFormatter(formatter)
 

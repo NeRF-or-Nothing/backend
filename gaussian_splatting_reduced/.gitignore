@@ -11,3 +11,4 @@ screenshots
 data/*
 .prettierrc
 test_env/*
+*.log
