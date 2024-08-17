@@ -1,3 +1,0 @@
-[2024-08-14 00:13:01,390] INFO - dispatch_service - __init__ - GaussianJobDispatcher Initialized
-[2024-08-14 00:13:01,390] INFO - dispatch_service - __init__ - base_url: http://nerf-worker-gaussian:5200/
-[2024-08-14 00:13:01,390] INFO - dispatch_service - __init__ - Number of available GPUs: 1

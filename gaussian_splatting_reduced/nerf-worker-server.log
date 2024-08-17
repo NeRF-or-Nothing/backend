@@ -1,3 +1,0 @@
-[2024-08-14 00:13:00,506] INFO - fileserver_service - setup_routes - Routes set up
-[2024-08-14 00:13:00,506] INFO - fileserver_service - __init__ - FileServer initialized
-[2024-08-14 00:13:00,506] INFO - fileserver_service - start - Starting FileServer on 0.0.0.0:5200
