@@ -1,3 +1,6 @@
 [submodule "NeRF/TensoRF"]
 	path = NeRF/TensoRF
 	url = git@github.com:NeRF-or-Nothing/TensoRF.git
+[submodule "GoWebServer"]
+	path = GoWebServer
+	url = https://github.com/NeRF-or-Nothing/GoWebServer.git
