@@ -6,13 +6,16 @@
 # so you may need to manually clear the database if you want to start
 # fresh.
 
-find ./colmap/data/inputs -type f -delete
-find ./colmap/data/outputs -mindepth 1 -delete
-find ./TensoRF/data/sfm_data -mindepth 1 -delete
-find ./TensoRF/data/nerf_data -mindepth 1 -delete
-find ./TensoRF/log -mindepth 1 -delete
+find ./sfm-worker/data/inputs -type f -delete
+find ./sfm-worker/data/outputs -mindepth 1 -delete
+
+find ./nerf-worker/data/nerf -mindepth 1 -delete
+find ./nerf-worker/data/sfm -mindepth 1 -delete
+
 find ./web-server/data/nerf -mindepth 1 -delete
 find ./web-server/data/raw/videos -mindepth 1 -delete
 find ./web-server/data/sfm -mindepth 1 -delete
-find ./gaussian_splatting_reduced/data/nerf -mindepth 1 -delete
-find ./gaussian_splatting_reduced/data/sfm -mindepth 1 -delete
+
+find ./go-web-server/data/nerf -mindepth 1 -delete
+find ./go-web-server/data/raw/videos -mindepth 1 -delete
+find ./go-web-server/data/sfm -mindepth 1 -delete
