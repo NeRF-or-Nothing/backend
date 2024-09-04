@@ -1,6 +1,10 @@
 # Description: This script empties all the local run data, this
-# is particularly useful when you want to keep disk impact small
-# while debugging or testing the code.
+# is particularly useful when using volume mapping and  want to keep
+# disk impact small while debugging or testing the code.
+
+# Note this does not clear the references to this data in mongoDB
+# so you may need to manually clear the database if you want to start
+# fresh.
 
 find ./colmap/data/inputs -type f -delete
 find ./colmap/data/outputs -mindepth 1 -delete

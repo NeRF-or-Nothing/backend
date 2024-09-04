@@ -43,7 +43,7 @@ class RabbitMQServiceV2:
         self.rabbitmq_domain = rabbitip
         self.queue_manager = manager
         self.scene_manager = scene_manager
-        self.base_url = "https://host.docker.internal:5000/"
+        self.base_url = "http://host.docker.internal:5000/"
         self.credentials = pika.PlainCredentials(str(os.getenv("RABBITMQ_DEFAULT_USER")), str(os.getenv("RABBITMQ_DEFAULT_PASS")))
         self.parameters = pika.ConnectionParameters(self.rabbitmq_domain, 5672, '/', self.credentials, heartbeat=300)
         # Publish function connections

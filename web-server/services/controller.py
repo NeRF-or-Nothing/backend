@@ -10,7 +10,7 @@ NOTE TO ALL FUTURE DEVELOPERS:
       should be moved to the ClientService class
     - Currently, Docker Compose generates a self-signed certificate that is stored in a shared volume across all workers. When implementing a reverse proxy,
       you will have to modify communication on worker-side restrictions so workers can only communicate with webserver
-    - I tried very hard to get HTTPS and HTTP to work in tandem, and it was a nightmare. I would recommend just using HTTPS for everything until deployment
+    - I tried very hard to get HTTPS and HTTP to work in tandem, and it was a nightmare. I would recommend just using HTTP for everything until deployment
     
 TODO: Unify error handling and response messages
 TODO: Create endpoint to list all available resources for a job id. Should prob follow call stack of get user data -> get all user jobs -> get resource data for job
@@ -96,8 +96,7 @@ class WebServer:
              r"/*": {"origins":
                      [
                          "http://localhost:3001",
-                         "https://*.ngrok-free.app",
-                         "http://localhost:3000"
+                         "http://localhost:5173"
                      ]
                      }
              },

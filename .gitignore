@@ -9,3 +9,6 @@ Pipfile
 .env*.local
 
 *.log
+
+# Submodules
+/go-web-server

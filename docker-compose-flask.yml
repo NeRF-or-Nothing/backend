@@ -1,0 +1,121 @@
+x-environment: &environment
+  COMPOSE_DOCKER_CLI_BUILD: 1 # Enables DOCKER_BUILDKIT (Used to cache go mod/py pip dependencies)
+
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    environment:
+      <<: *environment
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+    ports:
+      - 27017:27017
+    volumes:
+      - mongodb_data_container:/data/db
+    networks:
+      - backend
+
+  rabbitmq:
+    container_name: rabbitmq
+    image: rabbitmq:3.8-management-alpine
+    environment:
+      <<: *environment
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+    ports:
+      # AMQP protocol port
+      - "5672:5672"
+      # HTTP management UI
+      - "15672:15672"
+    networks:
+      - backend
+
+  web-server:
+    build:
+      context: ./web-server
+      dockerfile: ./Dockerfile
+    image: web-server-img
+    container_name: web-server
+    depends_on:
+      - rabbitmq
+      - mongodb
+    environment:
+      <<: *environment
+      APP_PORT: 5000
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      MONGO_IP: mongodb
+      JWT_SECRET: ${JWT_SECRET_KEY}
+    volumes:
+      - ./web-server/data:/app/data
+      - ./web-server/web-server.log:/app/web-server.log
+    ports:
+      - 5000:5000
+    networks:
+      - backend
+  
+  sfm-worker:
+    build:
+      context: ./sfm-worker
+      dockerfile: Dockerfile
+    image: sfm-worker-img
+    container_name: sfm-worker
+    depends_on:
+      - rabbitmq
+      - web-server
+    environment:
+      <<: *environment
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+      SFM_USE_GPU: ${SFM_USE_GPU}
+    volumes:
+      - ./sfm-worker:/app
+    ports:
+      - 5100:5100
+    networks:
+      - backend
+    command: python3.10 main.py --config=configs/default.txt
+    deploy: # Use NVIDIA GPUs
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  nerf-worker:
+    build:
+      context: ./nerf-worker
+      dockerfile: Dockerfile
+    image: nerf-worker-img
+    container_name: nerf-worker
+    depends_on:
+      - rabbitmq
+      - web-server
+    volumes:
+      - ./nerf-worker:/app
+    environment:
+      <<: *environment
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+    ports:
+      - 5200:5200
+    networks:
+      - backend
+    command: python3.8 main.py
+    deploy: # Use NVIDIA GPUs
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+networks:
+  backend:
+    name: backend-network
+    driver: bridge
+
+volumes:
+  mongodb_data_container:
