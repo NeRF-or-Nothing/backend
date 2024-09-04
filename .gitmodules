@@ -4,3 +4,6 @@
 [submodule "nerf-worker"]
 	path = nerf-worker
 	url = https://github.com/NeRF-or-Nothing/nerf-worker.git
+[submodule "sfm-worker"]
+	path = sfm-worker
+	url = https://github.com/NeRF-or-Nothing/sfm-worker.git
