@@ -1,3 +1,3 @@
-[submodule GoWebServer]
+[submodule "GoWebServer"]
 	path = go-web-server/
 	url = https://github.com/NeRF-or-Nothing/GoWebServer.git
