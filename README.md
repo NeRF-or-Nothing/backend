@@ -124,20 +124,36 @@ aforementioned folders.
 
 ## Getting Started
 
-To run the project install and run the web-server, the nerf worker, and the
-colmap worker in any order by running their respective installations in their
-READMEs. Once these are running the front-end can be started by visiting the
-[front end repo](https://github.com/NeRF-or-Nothing/web-app). Once everything is
-running the website should be available at `localhost:3000` and a video can
-be uploaded to test the application.
-
 ### Prerequisites
 
 1. Have [Docker](https://www.docker.com/) installed locally
-2. Install [COLMAP](https://colmap.github.io/)
-3. Install [ffmpeg](https://ffmpeg.org/)
-4. If you intend to run the NeRF and COLMAP workers locally ensure you have
-NVIDIA GPUS with atleast 6GB of vram as these are resource intensive applications
+2. Have a CUDA 11.7+ Nvidia GPU (To run training) 
+3. Follow the service prerequisites:
+   - [go-web-server]()
+   - [sfm-worker]()
+   - [nerf-worker]() **IMPORTANT READ**  
+
+### Instalation
+
+The project should be be easy to install/run once you have completed the respective prerequisites.
+The files `./docker-compose-go.yml` and `docker-compose-flask.yml` handle the setup given that you want to run
+V3 or V2 of the api, respectively. 
+
+1. Clone this repository
+  ```
+  git clone https://github.com/NeRF-or-Nothing/backend.git
+  ```
+
+2. Compose the backend. View indepth [instructions]()
+  ```
+  docker compose -f <chosen_compose_file>.yml up -d
+  ```
+
+3. Follow the [frontend](https://github.com/NeRF-or-Nothing/frontend) installation.
+
+Once everything is running the website should be available at `localhost:5173` and a video can
+be uploaded to test the application.
+
 
 ## Output Example
 
@@ -148,7 +164,18 @@ dataset lego example to a video then running vidtonerf produces the following re
 
 ## Roadmap
 
-TODO
+- ** Deployment **: The team has been mixing with the idea of deploying for numerous years now. In order to do so we need to get production ready. 
+    1. More request verification
+    2. Reverse proxy
+    3. TSL/SSL frontend
+    4. Lockdown communication
+- ** Colmap **: Colmap is notoriously hard to please, and we should investigate how to make it more tolerant of user videos. See [Colmap Brainstorming]() to get started.
+- ** Expand functionality **: We could possible expand into a more general purpose Deep Learning powered video app. Some possibilites:
+    1. Stylized Text-to-Scene: Recent research for Text-Based Scene generation has shown crazy progress on stylized/themed scene generation
+- ** Testing and Cleanup **: We can always improve our codebase by implementing further testing.
+- ** CI/CD Pipelines **: Upon successful deployment we could set up dedicated testing pipelines. This would be a big stretch. For now, we could create
+  workflows to ensure code quality, security, and testing coverage for lighter parts of the system.
+- ** Docker Hub Image Generation **: Setting up image generation would allow for users to easily start their own instance without build hassles.
 
 ## Contributing
 
