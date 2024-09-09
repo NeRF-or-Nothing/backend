@@ -3,7 +3,7 @@
 	url = https://github.com/NeRF-or-Nothing/go-web-server.git
 [submodule "nerf-worker"]
 	path = nerf-worker
-	url = https://github.com/NeRF-or-Nothing/nerf-worker.git
+	url = https://github.com/NeRF-or-Nothing/nerf-worker.git			
 [submodule "sfm-worker"]
 	path = sfm-worker
 	url = https://github.com/NeRF-or-Nothing/sfm-worker.git
