@@ -164,18 +164,18 @@ dataset lego example to a video then running vidtonerf produces the following re
 
 ## Roadmap
 
-- ** Deployment **: The team has been mixing with the idea of deploying for numerous years now. In order to do so we need to get production ready. 
+- **Deployment**: The team has been mixing with the idea of deploying for numerous years now. In order to do so we need to get production ready. 
     1. More request verification
     2. Reverse proxy
     3. TSL/SSL frontend
     4. Lockdown communication
-- ** Colmap **: Colmap is notoriously hard to please, and we should investigate how to make it more tolerant of user videos. See [Colmap Brainstorming]() to get started.
-- ** Expand functionality **: We could possible expand into a more general purpose Deep Learning powered video app. Some possibilites:
+- **Colmap**: Colmap is notoriously hard to please, and we should investigate how to make it more tolerant of user videos. See [Colmap Brainstorming]() to get started.
+- **Expand functionality**: We could possible expand into a more general purpose Deep Learning powered video app. Some possibilites:
     1. Stylized Text-to-Scene: Recent research for Text-Based Scene generation has shown crazy progress on stylized/themed scene generation
-- ** Testing and Cleanup **: We can always improve our codebase by implementing further testing.
-- ** CI/CD Pipelines **: Upon successful deployment we could set up dedicated testing pipelines. This would be a big stretch. For now, we could create
+- **Testing and Cleanup**: We can always improve our codebase by implementing further testing.
+- **CI/CD Pipelines**: Upon successful deployment we could set up dedicated testing pipelines. This would be a big stretch. For now, we could create
   workflows to ensure code quality, security, and testing coverage for lighter parts of the system.
-- ** Docker Hub Image Generation **: Setting up image generation would allow for users to easily start their own instance without build hassles.
+- **Docker Hub Image Generation**: Setting up image generation would allow for users to easily start their own instance without build hassles.
 
 ## Contributing
 
@@ -212,11 +212,11 @@ Or, inquire at: `nerf@quicktechtime.com`
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
-[contributors-shield]: https://img.shields.io/github/contributors/NeRF-or-Nothing/vidtonerf.svg?style=for-the-badge
-[contributors-url]: https://github.com/NeRF-or-Nothing/vidtonerf/graphs/contributors
-[forks-shield]: https://img.shields.io/github/forks/NeRF-or-Nothing/vidtonerf.svg?style=for-the-badge
-[forks-url]: https://github.com/NeRF-or-Nothing/vidtonerf/network/members
-[issues-shield]: https://img.shields.io/github/issues/NeRF-or-Nothing/vidtonerf.svg?style=for-the-badge
-[issues-url]: https://github.com/NeRF-or-Nothing/vidtonerf/issues
-[license-shield]: https://img.shields.io/github/license/NeRF-or-Nothing/vidtonerf.svg?style=for-the-badge
-[license-url]: https://github.com/NeRF-or-Nothing/vidtonerf/blob/master/LICENSE.txt
+[contributors-shield]: https://img.shields.io/github/contributors/NeRF-or-Nothing/backend.svg?style=for-the-badge
+[contributors-url]: https://github.com/NeRF-or-Nothing/backend/graphs/contributors
+[forks-shield]: https://img.shields.io/github/forks/NeRF-or-Nothing/backend.svg?style=for-the-badge
+[forks-url]: https://github.com/NeRF-or-Nothing/backend/network/members
+[issues-shield]: https://img.shields.io/github/issues/NeRF-or-Nothing/backend.svg?style=for-the-badge
+[issues-url]: https://github.com/NeRF-or-Nothing/backend/issues
+[license-shield]: https://img.shields.io/github/license/NeRF-or-Nothing/backend.svg?style=for-the-badge
+[license-url]: https://github.com/NeRF-or-Nothing/backend/blob/master/LICENSE.txt
