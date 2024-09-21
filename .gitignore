@@ -7,3 +7,5 @@ Pipfile
 # Do not commit any .env files to git, except for the .env.example file.
 .env
 .env*.local
+
+*.log

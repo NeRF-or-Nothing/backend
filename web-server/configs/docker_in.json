@@ -1,5 +1,0 @@
-{
-    "mongodomain": "mongodb",
-    "rabbitmqdomain": "rabbitmq",
-    "flaskdomain": "0.0.0.0"
-}
